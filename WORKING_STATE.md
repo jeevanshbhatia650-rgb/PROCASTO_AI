@@ -48,3 +48,17 @@ Every entry is a state that was verified to work. Before changing a module liste
 ## [Serve] Single process - WORKING ✅ (2026-09-29)
 - Commit: `0fdfbe8`
 - After `npm --prefix frontend run build`, uvicorn serves the UI at `/` alongside `/api`, `/ws` and the integrations. Verified: `GET /` returns the app, `/healthz` and `/api/devices` still answer, 197 backend tests pass.
+
+## [Review] Code and security review fixes - WORKING ✅ (2026-09-29)
+- Commit: `aba5557`
+- Fixed and tested: failing device commands no longer end the session; request bodies are capped while streaming; signing-key fetches are rate limited and cached; Alexa fails closed without `ALEXA_SKILL_ID`; parked plans, evidence, idempotency keys and card severities are bounded. Backend 215 tests.
+
+## [M13] Polish and deploy files - PARTIAL ⚠️ (2026-09-29)
+- Commit: see `git log --grep "M13"`
+- Found by watching recorded frames of the replay, now fixed and tested:
+  - "wait I meant the dryer" showed "Nothing yet" in "What it understood". The panel now shows the question carried over to the named device (`mentions` on `clauses.update`).
+  - A spoken "go back to the washer" left "Last question" at "–". The refetch is now timed.
+  - Timeline axis labels no longer collide with "you finished" or wrap at the edge. Clause and event labels move left rather than cover the next mark.
+- Deploy: `Dockerfile` (one service), `.dockerignore` and `render.yaml`. Smoke-tested without Docker: `uv sync --frozen --no-dev --extra dense` in a fresh venv, the `/app` layout, `/healthz`, `/` and the WebSocket all work. The image build itself is untested because Docker isn't installed. Nothing is deployed yet.
+- Tests: backend 216 (95 % coverage), frontend 34. ruff, vulture, tsc, eslint, knip clean; build 134 KB gzipped JS.
+- Not done: recorded video (the user will record it), README refresh (deferred on request).

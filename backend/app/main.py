@@ -7,9 +7,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import routes_alexa, routes_manuals, routes_sim, routes_smartthings, ws
-from app.config import DATA_DIR, Settings, load_devices
+from app.config import BACKEND_DIR, DATA_DIR, Settings, load_devices
 from app.context import AppContext
 from app.core.bus import Bus
 from app.core.ids import SystemClock
@@ -23,6 +24,7 @@ from app.retrieval.manual_search import ManualIndex
 from app.state.live_store import LiveStore
 
 log = logging.getLogger(__name__)
+UI_DIST = BACKEND_DIR.parent / "frontend" / "dist"
 
 
 async def build_context(settings: Settings) -> AppContext:
@@ -95,4 +97,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "dense_model": ctx.manuals.dense_model,
         }
 
+    if UI_DIST.is_dir():  # after `npm run build`, one process serves the whole demo
+        app.mount("/", StaticFiles(directory=UI_DIST, html=True), name="ui")
     return app

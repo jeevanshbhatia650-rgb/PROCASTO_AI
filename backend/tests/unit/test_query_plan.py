@@ -124,6 +124,14 @@ def test_parked_stack_keeps_three_plans(engine):
     assert len(engine.parked()) == 3
 
 
+def test_eviction_from_the_parked_stack_is_reported(engine):
+    first = engine.update([clause(Intent.STATUS, device="washer-01")], "u1")
+    evicted = []
+    for i, device in enumerate(["dryer-01", "ac-01", "washer-01", "dryer-01"], start=2):
+        evicted += engine.correct([], [device], f"u{i}").evicted_plan_ids
+    assert evicted == [first.plan_id]
+
+
 def test_cancel_all_retires_the_plan(engine):
     first = engine.update([clause(Intent.STATUS)], "u1")
     diff = engine.cancel_all()

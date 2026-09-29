@@ -45,6 +45,21 @@ async def test_talking_over_the_voice_counts_as_an_interruption(env):
     assert "speech.stop" in kinds
 
 
+async def test_a_plan_pushed_out_of_the_parked_stack_takes_its_cards_with_it(env):
+    ctx, session, outbox = env
+    await session.on_final("how long until the washer finishes", 1)
+    await session.pipeline.orchestrator.drain()
+    first = session.engine.active().plan_id
+    assert session.composer.cards_for(first)
+    for correction in ("wait I meant the dryer", "wait I meant the AC", "actually the washer", "no, the dryer"):
+        await session.on_final(correction, 1)
+        await session.pipeline.orchestrator.drain()
+    assert first not in [p.plan_id for p in session.engine.parked()]
+    assert session.composer.cards_for(first) == []
+    removed = {m["card_id"] for m in outbox.of("card.remove")}
+    assert any(card_id.startswith(f"{first}:") for card_id in removed)
+
+
 async def test_cancel_phrase_clears_the_plan_and_stops_speech(env):
     ctx, session, outbox = env
     await session.on_final("is the dryer done", 1)

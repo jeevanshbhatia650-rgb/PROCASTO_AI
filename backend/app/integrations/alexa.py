@@ -2,8 +2,9 @@
 
 Alexa delivers only final utterances, so this path has no partial-transcript streaming and no barge-in. Intents
 are turned back into sentences and fed through the exact session pipeline the web app uses. Read-only: device
-commands are never executed from Alexa. Not implemented: Alexa's request-signature (certificate chain) check,
-which Amazon requires before a skill can be certified; the optional ALEXA_SKILL_ID check below is not a substitute.
+commands are never executed from Alexa. Off unless ALEXA_SKILL_ID is set (fails closed). Not implemented: Alexa's
+request-signature (certificate chain) check, which Amazon requires before a skill can be certified; the skill id
+check below is not a substitute, because an application id is not a secret.
 """
 
 import hashlib
@@ -77,14 +78,16 @@ class AlexaSessions:
 
 
 def _check(body: dict[str, Any], ctx: AppContext, now: datetime) -> None:
+    skill = ctx.settings.alexa_skill_id
+    if not skill:  # fail closed: without a skill id anyone could query the home through this endpoint
+        raise AlexaError(503, "Alexa is off. Set ALEXA_SKILL_ID to your skill id to turn it on.")
     try:
         sent = datetime.fromisoformat(str(body["request"]["timestamp"]).replace("Z", "+00:00"))
     except (KeyError, ValueError) as exc:
         raise AlexaError(400, "missing or unreadable request timestamp") from exc
     if abs((now - sent).total_seconds()) > MAX_REQUEST_AGE_S:
         raise AlexaError(400, "request timestamp is too old")
-    skill = ctx.settings.alexa_skill_id
-    if skill and body.get("session", {}).get("application", {}).get("applicationId") != skill:
+    if body.get("session", {}).get("application", {}).get("applicationId") != skill:
         raise AlexaError(403, "request is for a different skill")
 
 

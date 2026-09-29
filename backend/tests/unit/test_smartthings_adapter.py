@@ -40,7 +40,7 @@ def make_key():
 
 
 KEY, CERT = make_key()
-OTHER_KEY, _ = make_key()
+OTHER_KEY, OTHER_CERT = make_key()
 
 
 def signed(body: bytes, key=KEY, when=NOW, digest=None) -> dict[str, str]:
@@ -172,6 +172,52 @@ async def test_signing_keys_are_cached():
     await h.post(FIXTURE, signed(FIXTURE))
     await h.post(FIXTURE, signed(FIXTURE))
     assert h.key_fetches == 1
+
+
+def signed_with_key_id(body: bytes, key_id: str) -> dict[str, str]:
+    headers = signed(body)
+    headers["Authorization"] = headers["Authorization"].replace("/pl/useast1/test-key", key_id)
+    return headers
+
+
+async def test_a_key_that_failed_is_not_fetched_again_for_a_minute():
+    fetches = []
+
+    async def failing(key_id):
+        fetches.append(key_id)
+        raise httpx.ConnectError("key server down")
+
+    verifier = SignatureVerifier(failing, now=NOW.timestamp)
+    for _ in range(3):
+        with pytest.raises(SignatureError):
+            await verifier.verify("POST", PATH, signed(FIXTURE), FIXTURE)
+    assert fetches == ["/pl/useast1/test-key"]
+
+
+async def test_random_key_ids_cannot_turn_us_into_an_amplifier():
+    fetches = []
+
+    async def fetch(key_id):
+        fetches.append(key_id)
+        return OTHER_CERT  # a real certificate, just not the one that signed the request
+
+    verifier = SignatureVerifier(fetch, now=NOW.timestamp)
+    for i in range(10):
+        with pytest.raises(SignatureError):  # each has a valid-looking header but a bogus key id
+            await verifier.verify("POST", PATH, signed_with_key_id(FIXTURE, f"/pl/useast1/bogus-{i}"), FIXTURE)
+    assert len(fetches) == 6  # the global budget per minute, then no more outbound requests
+
+
+async def test_key_cache_stays_bounded():
+    async def fetch(_key_id):
+        return CERT
+
+    clock = [NOW.timestamp()]
+    verifier = SignatureVerifier(fetch, now=lambda: clock[0])
+    for i in range(40):
+        clock[0] += 61  # step past the fetch budget window each time
+        await verifier._key(f"/pl/useast1/key-{i}")
+    assert len(verifier._cache) <= 32
 
 
 async def test_key_fetcher_only_goes_to_the_smartthings_key_host():

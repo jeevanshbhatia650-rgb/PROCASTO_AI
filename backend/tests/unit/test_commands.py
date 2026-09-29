@@ -1,7 +1,7 @@
 import pytest
 
 from app.core.models import CardCommand, CardType
-from app.devices.commands import CommandGate, describe
+from app.devices.commands import REMEMBERED_COMMANDS, CommandError, CommandGate, describe
 
 
 class FakeProvider:
@@ -38,6 +38,37 @@ async def test_unknown_device_is_rejected(devices):
     commands, _ = gate(devices)
     with pytest.raises(ValueError):
         await commands.execute(CardCommand(device_id="oven-9", command="power_off", label="x"), "k")
+
+
+class DownProvider:
+    async def send_command(self, device_id, command, args):
+        raise TimeoutError("cloud did not answer")
+
+
+async def test_a_device_that_doesnt_answer_becomes_a_friendly_error(devices):
+    commands = CommandGate(DownProvider(), {d.device_id: d for d in devices}, False, False)
+    with pytest.raises(CommandError, match="The AC didn't respond"):
+        await commands.execute(SET_24, "k")
+
+
+async def test_idempotency_memory_is_bounded(devices):
+    commands, _ = gate(devices)
+    for i in range(REMEMBERED_COMMANDS + 50):
+        await commands.execute(SET_24, f"card-{i}")
+    assert len(commands._done) == REMEMBERED_COMMANDS
+
+
+async def test_confirm_on_a_device_that_fails_keeps_the_session_alive(env):
+    ctx, session, outbox = env
+    await session.on_final("set the AC to 25", 1)
+    await session.pipeline.orchestrator.drain()
+    confirm = next(c for c in session.composer.cards_for(session.engine.active().plan_id) if c.type == CardType.CONFIRM)
+    ctx.commands._provider = DownProvider()
+    await session.on_confirm(confirm.card_id, True)
+    assert outbox.of("error")[-1]["message"].startswith("The AC didn't respond")
+    await session.on_final("is the dryer done", 1)  # the session still answers afterwards
+    await session.pipeline.orchestrator.drain()
+    assert {c.device_id for c in session.engine.active().clauses} == {"dryer-01"}
 
 
 def test_describe_reads_naturally():

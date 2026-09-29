@@ -57,8 +57,9 @@ class Pipeline:
             self._task(task, None)
         for task in diff.reused:
             self._task(self._engine.set_status(task.task_id, task.status, note="reused") or task, None)
-        if diff.retired_plan_id:
-            self._composer.retire(diff.retired_plan_id)
+        for plan_id in [diff.retired_plan_id, *diff.evicted_plan_ids]:
+            if plan_id:
+                self._composer.retire(plan_id)
         now = self._timeline.now_ms()
         for task in [*diff.added, *diff.refetched]:
             self._task(task, None)

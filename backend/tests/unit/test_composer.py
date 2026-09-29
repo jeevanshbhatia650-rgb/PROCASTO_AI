@@ -222,6 +222,18 @@ async def test_spoken_summary_reads_the_cards_in_order(world):
     )
 
 
+async def test_a_late_cancellation_cannot_orphan_a_newer_phrasing_job(devices, bus, clock):
+    world = World(devices, bus, clock, llm=SlowLLM())
+    await world.set("washer-01", state="ERROR", error_code="E3", remaining_min=14, power_w=0)
+    await world.run(world.engine.update([clause(Intent.ERROR_LOOKUP, code="E3")], "u1"))
+    await asyncio.sleep(0)  # job 1 is now running inside the LLM call
+    assert world.composer.cancel_llm() == 1  # barge-in cancels job 1...
+    world.composer.compose(world.engine.active())  # ...and the same card asks for phrasing again (job 2)
+    await asyncio.sleep(0)  # job 1's cancellation lands (its cleanup runs) after job 2 exists
+    await asyncio.sleep(0)
+    assert world.composer.cancel_llm() == 1  # job 2 is still tracked, so a second barge-in can stop it
+
+
 async def test_cancel_llm_stops_pending_phrasing(devices, bus, clock):
     world = World(devices, bus, clock, llm=SlowLLM())
     await world.set("washer-01", state="ERROR", error_code="E3", remaining_min=14, power_w=0)

@@ -1,7 +1,17 @@
 """F24: device commands only run after the user confirms a card, at most once per card revision."""
 
+import logging
+from collections import OrderedDict
+
 from app.core.models import CardCommand, DeviceInfo
 from app.devices.provider import DeviceProvider
+
+log = logging.getLogger(__name__)
+REMEMBERED_COMMANDS = 200
+
+
+class CommandError(Exception):
+    """The device (or its cloud) didn't take the command. Nothing changed."""
 
 
 def describe(command: CardCommand, name: str) -> str:
@@ -22,7 +32,7 @@ class CommandGate:
         self._infos = infos
         self._real_devices = real_devices
         self._allow_real = allow_real
-        self._done: dict[str, str] = {}
+        self._done: OrderedDict[str, str] = OrderedDict()
 
     async def execute(self, command: CardCommand, idempotency_key: str) -> str:
         if idempotency_key in self._done:
@@ -31,7 +41,16 @@ class CommandGate:
             raise PermissionError("Device control is off. Set ALLOW_COMMANDS=true to control real devices.")
         if command.device_id not in self._infos:
             raise ValueError(f"Unknown device {command.device_id}")
-        await self._provider.send_command(command.device_id, command.command, command.args)
-        message = describe(command, self._infos[command.device_id].display_name)
+        name = self._infos[command.device_id].display_name
+        try:
+            await self._provider.send_command(command.device_id, command.command, command.args)
+        except (ValueError, PermissionError):
+            raise  # already a clear, user-facing reason
+        except Exception as exc:  # network, timeout, cloud error: report it, keep the session alive
+            log.warning("%s to %s failed: %s", command.command, command.device_id, type(exc).__name__)
+            raise CommandError(f"The {name} didn't respond, so nothing was changed. Try again in a moment.") from exc
+        message = describe(command, name)
         self._done[idempotency_key] = message
+        while len(self._done) > REMEMBERED_COMMANDS:
+            self._done.popitem(last=False)
         return message

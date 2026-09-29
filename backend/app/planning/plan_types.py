@@ -20,6 +20,7 @@ class PlanDiff:
     refetched: list[RetrievalTask] = field(default_factory=list)
     reused: list[RetrievalTask] = field(default_factory=list)
     retired_plan_id: str | None = None
+    evicted_plan_ids: list[str] = field(default_factory=list)  # parked plans pushed out of the stack
     parked_plan_id: str | None = None
     resumed_plan_id: str | None = None
     resume_missed: bool = False

@@ -120,6 +120,9 @@ async def session_socket(websocket: WebSocket, session_id: str) -> None:
                 await handle(model.model_validate(raw.get("data") or {}))
             except ValidationError as exc:
                 send("error", {"message": f"invalid {kind}: {exc.errors()[0]['msg']}"})
+            except Exception:  # backstop: one failing handler must not end a live demo session
+                log.exception("handling %s failed", kind)
+                send("error", {"message": "That didn't work, but the session is still running."})
     except WebSocketDisconnect:
         pass
     finally:

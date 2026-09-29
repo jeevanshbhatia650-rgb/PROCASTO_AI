@@ -71,5 +71,12 @@ def test_requests_for_another_skill_are_rejected(client):
     assert client.post("/integrations/alexa", json=body).status_code == 403
 
 
+def test_alexa_is_off_until_a_skill_id_is_configured():
+    with TestClient(create_app(make_settings())) as unconfigured:
+        response = unconfigured.post("/integrations/alexa", json=request())
+        assert response.status_code == 503
+        assert "ALEXA_SKILL_ID" in response.json()["detail"]
+
+
 def test_garbage_is_a_400(client):
     assert client.post("/integrations/alexa", content=b"not json").status_code == 400

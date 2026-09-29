@@ -86,6 +86,7 @@ class Composer:
         for card_id in [cid for cid, c in self._sent.items() if c.plan_id == plan_id]:
             self._remove(card_id)
         self._plans.pop(plan_id, None)
+        self._phrases = {k: v for k, v in self._phrases.items() if not k.startswith(f"{plan_id}:")}
 
     def resolve_confirm(self, card_id: str, text: CardText) -> None:
         self._confirmed[card_id] = text
@@ -312,8 +313,11 @@ class Composer:
             log.warning("LLM phrasing failed (%s); keeping the manual's own words", type(exc).__name__)
             return
         finally:
-            self._pending.discard(key)
-            self._jobs.pop(key, None)
+            # A cancelled job's cleanup can land after a newer job for the same key started;
+            # only clear the bookkeeping if it's still ours, or the newer job becomes uncancellable.
+            if self._jobs.get(key) is asyncio.current_task():
+                self._pending.discard(key)
+                self._jobs.pop(key, None)
         text = " ".join(text.split())[:320]
         if not text:
             return

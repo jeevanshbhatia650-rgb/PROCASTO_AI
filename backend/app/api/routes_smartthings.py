@@ -3,11 +3,13 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from app.api.guards import RateLimiter, read_capped
 from app.devices.smartthings.oauth import OAuthError
 from app.devices.smartthings.provider import SmartThingsProvider
 from app.devices.smartthings.webhook import MAX_BODY_BYTES
 
 router = APIRouter()
+WEBHOOK_LIMIT = RateLimiter(max_requests=120, window_s=60)  # SmartThings sends a handful of events a minute
 
 
 def _provider(request: Request) -> SmartThingsProvider:
@@ -41,9 +43,7 @@ async def callback(
 @router.post("/webhooks/smartthings")
 async def webhook(request: Request) -> JSONResponse:
     provider = _provider(request)
-    if int(request.headers.get("content-length") or 0) > MAX_BODY_BYTES:
-        return JSONResponse({"error": "payload too large"}, status_code=413)
-    status, payload = await provider.webhook.handle(
-        request.method, request.url.path, request.headers, await request.body()
-    )
+    WEBHOOK_LIMIT.check(request)
+    body = await read_capped(request, MAX_BODY_BYTES)
+    status, payload = await provider.webhook.handle(request.method, request.url.path, request.headers, body)
     return JSONResponse(payload, status_code=status)

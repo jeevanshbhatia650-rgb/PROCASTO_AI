@@ -265,7 +265,7 @@ class QueryPlanEngine:
                 diff.parked.append(plan.tasks[task_id])
         self._parked.append(plan)
         if len(self._parked) > self._max_parked:
-            self._parked.pop(0)
+            diff.evicted_plan_ids.append(self._parked.pop(0).plan_id)
         diff.parked_plan_id = plan.plan_id
         self._active = None
 

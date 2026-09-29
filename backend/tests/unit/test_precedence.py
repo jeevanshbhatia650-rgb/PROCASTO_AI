@@ -58,6 +58,16 @@ def test_plain_facts_are_what_the_llm_sees(devices, clock):
     assert resolve([live], washer(devices)).plain() == {"state": "ERROR", "error_code": "E3"}
 
 
+def test_evidence_store_drops_the_oldest_per_device(clock):
+    store = EvidenceStore(max_per_device=3)
+    items = [ev(clock, f"e{i}", "live_state", {"attributes": {}}) for i in range(5)]
+    for item in items:
+        store.put(item)
+    assert [e.evidence_id for e in store.for_device("washer-01")] == ["e2", "e3", "e4"]
+    assert store.get("e0") is None and store.for_task("T-e0") is None
+    assert store.for_task("T-e4") is items[4]
+
+
 def test_evidence_store_indexes_by_task_and_device(clock):
     store = EvidenceStore()
     item = ev(clock, "x", "live_state", {"attributes": {}})

@@ -11,6 +11,7 @@ from app.answer.templates import CardText, spoken_name
 from app.context import AppContext
 from app.core.ids import IdCounter
 from app.core.models import AnswerCard, CardType, Intent
+from app.devices.commands import CommandError
 from app.evidence.store import EvidenceStore
 from app.nlu.clause_extractor import ClauseExtractor
 from app.observability.metrics import MetricsTracker
@@ -28,6 +29,7 @@ from app.state.live_store import DeviceChange
 log = logging.getLogger(__name__)
 Send = Callable[[str, Any], None]
 SETTLE_POLLS = 15  # wait up to 1.5 s for retrieval to finish before speaking
+MAX_TRACKED_CARDS = 200
 
 
 @dataclass
@@ -242,6 +244,8 @@ class Session:
             escalated = card.type == CardType.STATUS and before not in (None, "error") and card.severity == "error"
             if escalated and self._utterance is None and self._spoken_plan == card.plan_id:
                 self.speech.speak(f"Update: {card.speakable}", card.card_id, "update")
+        if len(self._severity) > MAX_TRACKED_CARDS:  # forget cards the composer has already dropped
+            self._severity = {cid: s for cid, s in self._severity.items() if self.composer.card(cid)}
 
     # ---------- the home changes ----------
 
@@ -294,7 +298,7 @@ class Session:
         command = card.command
         try:
             message = await self._ctx.commands.execute(command, f"{card_id}@{card.plan_revision}")
-        except (ValueError, PermissionError, KeyError) as exc:
+        except (ValueError, PermissionError, KeyError, CommandError) as exc:
             self.timeline.emit("command", device_id=command.device_id, command=command.command, ok=False)
             self._send("error", {"message": str(exc)})
             return

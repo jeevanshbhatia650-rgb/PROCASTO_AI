@@ -6,17 +6,18 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.api.guards import RateLimiter, read_capped
 from app.integrations.alexa import AlexaError, AlexaSessions, answer
 
 router = APIRouter()
 MAX_BODY_BYTES = 64 * 1024
+LIMIT = RateLimiter(max_requests=60, window_s=60)
 
 
 @router.post("/integrations/alexa")
 async def alexa(request: Request) -> dict[str, Any]:
-    raw = await request.body()
-    if len(raw) > MAX_BODY_BYTES:
-        raise HTTPException(413, "payload too large")
+    LIMIT.check(request)
+    raw = await read_capped(request, MAX_BODY_BYTES)
     try:
         body = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:

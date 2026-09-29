@@ -4,7 +4,14 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Contract(BaseModel):
+    """Every field is always sent, so generated TypeScript marks defaulted fields as required too."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
 
 # ---------- Devices ----------
 
@@ -15,7 +22,7 @@ class DeviceKind(StrEnum):
     AC = "ac"
 
 
-class DeviceInfo(BaseModel):
+class DeviceInfo(Contract):
     device_id: str
     kind: DeviceKind
     model_id: str  # "WW90T", used to filter manuals
@@ -27,7 +34,7 @@ class DeviceInfo(BaseModel):
 Attribute = Literal["state", "remaining_min", "power_w", "error_code", "temp_c", "target_temp_c"]
 
 
-class DeviceEvent(BaseModel):
+class DeviceEvent(Contract):
     """Normalized event. Simulator and SmartThings must both emit this."""
 
     event_id: str
@@ -38,7 +45,7 @@ class DeviceEvent(BaseModel):
     source: Literal["simulator", "smartthings"]
 
 
-class DeviceSnapshot(BaseModel):
+class DeviceSnapshot(Contract):
     info: DeviceInfo
     attributes: dict[str, Any]
     revision: int  # bumps on every applied event
@@ -57,7 +64,7 @@ class Intent(StrEnum):
     CANCEL = "cancel"
 
 
-class Clause(BaseModel):
+class Clause(Contract):
     clause_id: str
     device_id: str | None
     intent: Intent
@@ -68,7 +75,7 @@ class Clause(BaseModel):
     origin: Literal["user", "auto"] = "user"  # auto = added by the engine (error escalation)
 
 
-class Span(BaseModel):
+class Span(Contract):
     """A highlighted stretch of the transcript, for the live transcript view."""
 
     start: int
@@ -91,7 +98,7 @@ class TaskStatus(StrEnum):
 TaskKind = Literal["live_state", "manual", "session"]
 
 
-class RetrievalTask(BaseModel):
+class RetrievalTask(Contract):
     task_id: str
     clause_id: str
     kind: TaskKind
@@ -105,7 +112,7 @@ class RetrievalTask(BaseModel):
     note: str | None = None  # "replaces T1", "timeout", ...
 
 
-class QueryPlan(BaseModel):
+class QueryPlan(Contract):
     plan_id: str
     revision: int
     clauses: list[Clause]
@@ -114,7 +121,7 @@ class QueryPlan(BaseModel):
     label: str = ""
 
 
-class ParkedPlan(BaseModel):
+class ParkedPlan(Contract):
     """What the UI needs to show a parked plan and offer to resume it."""
 
     plan_id: str
@@ -128,7 +135,7 @@ class ParkedPlan(BaseModel):
 SourceType = Literal["live_state", "manual", "session"]
 
 
-class Evidence(BaseModel):
+class Evidence(Contract):
     evidence_id: str
     task_id: str
     source_type: SourceType
@@ -153,13 +160,13 @@ class CardType(StrEnum):
     CONFIRM = "confirm"  # a device command waiting for the user's yes
 
 
-class Source(BaseModel):
+class Source(Contract):
     kind: SourceType
     label: str
     observed_at: datetime | None = None
 
 
-class CardCommand(BaseModel):
+class CardCommand(Contract):
     """A device command the user can confirm from a card."""
 
     device_id: str
@@ -168,7 +175,7 @@ class CardCommand(BaseModel):
     label: str
 
 
-class AnswerCard(BaseModel):
+class AnswerCard(Contract):
     card_id: str
     type: CardType
     device_id: str | None
@@ -204,13 +211,13 @@ TimelineKind = Literal[
 ]
 
 
-class TimelineEvent(BaseModel):
+class TimelineEvent(Contract):
     t_ms: int  # ms since the session started
     kind: TimelineKind
     detail: dict[str, Any]
 
 
-class Metrics(BaseModel):
+class Metrics(Contract):
     lead_time_ms: int | None = None  # last utterance: end minus first stable task start
     best_lead_time_ms: int | None = None
     first_card_ms: int | None = None  # negative = the first card beat the end of speech

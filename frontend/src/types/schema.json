@@ -3,11 +3,9 @@
     "AnswerCard": {
       "properties": {
         "body": {
-          "title": "Body",
           "type": "string"
         },
         "card_id": {
-          "title": "Card Id",
           "type": "string"
         },
         "command": {
@@ -29,22 +27,18 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Device Id"
+          ]
         },
         "evidence_ids": {
           "items": {
             "type": "string"
           },
-          "title": "Evidence Ids",
           "type": "array"
         },
         "plan_id": {
-          "title": "Plan Id",
           "type": "string"
         },
         "plan_revision": {
-          "title": "Plan Revision",
           "type": "integer"
         },
         "severity": {
@@ -55,29 +49,24 @@
             "warn",
             "error"
           ],
-          "title": "Severity",
           "type": "string"
         },
         "sources": {
           "items": {
             "$ref": "#/$defs/Source"
           },
-          "title": "Sources",
           "type": "array"
         },
         "speakable": {
-          "title": "Speakable",
           "type": "string"
         },
         "steps": {
           "items": {
             "type": "string"
           },
-          "title": "Steps",
           "type": "array"
         },
         "title": {
-          "title": "Title",
           "type": "string"
         },
         "type": {
@@ -93,7 +82,11 @@
         "evidence_ids",
         "plan_revision",
         "speakable",
-        "plan_id"
+        "plan_id",
+        "severity",
+        "steps",
+        "sources",
+        "command"
       ],
       "title": "AnswerCard",
       "type": "object"
@@ -103,25 +96,22 @@
       "properties": {
         "args": {
           "additionalProperties": true,
-          "title": "Args",
           "type": "object"
         },
         "command": {
-          "title": "Command",
           "type": "string"
         },
         "device_id": {
-          "title": "Device Id",
           "type": "string"
         },
         "label": {
-          "title": "Label",
           "type": "string"
         }
       },
       "required": [
         "device_id",
         "command",
+        "args",
         "label"
       ],
       "title": "CardCommand",
@@ -141,7 +131,6 @@
     "Clause": {
       "properties": {
         "clause_id": {
-          "title": "Clause Id",
           "type": "string"
         },
         "device_id": {
@@ -152,8 +141,7 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Device Id"
+          ]
         },
         "error_code": {
           "anyOf": [
@@ -164,11 +152,9 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Error Code"
+          "default": null
         },
         "first_seen_ms": {
-          "title": "First Seen Ms",
           "type": "integer"
         },
         "intent": {
@@ -180,17 +166,14 @@
             "user",
             "auto"
           ],
-          "title": "Origin",
           "type": "string"
         },
         "params": {
           "additionalProperties": true,
-          "title": "Params",
           "type": "object"
         },
         "stable": {
           "default": false,
-          "title": "Stable",
           "type": "boolean"
         }
       },
@@ -198,7 +181,11 @@
         "clause_id",
         "device_id",
         "intent",
-        "first_seen_ms"
+        "error_code",
+        "params",
+        "stable",
+        "first_seen_ms",
+        "origin"
       ],
       "title": "Clause",
       "type": "object"
@@ -215,20 +202,16 @@
             "temp_c",
             "target_temp_c"
           ],
-          "title": "Attribute",
           "type": "string"
         },
         "device_id": {
-          "title": "Device Id",
           "type": "string"
         },
         "event_id": {
-          "title": "Event Id",
           "type": "string"
         },
         "observed_at": {
           "format": "date-time",
-          "title": "Observed At",
           "type": "string"
         },
         "source": {
@@ -236,12 +219,9 @@
             "simulator",
             "smartthings"
           ],
-          "title": "Source",
           "type": "string"
         },
-        "value": {
-          "title": "Value"
-        }
+        "value": {}
       },
       "required": [
         "event_id",
@@ -260,26 +240,21 @@
           "items": {
             "type": "string"
           },
-          "title": "Aliases",
           "type": "array"
         },
         "device_id": {
-          "title": "Device Id",
           "type": "string"
         },
         "display_name": {
-          "title": "Display Name",
           "type": "string"
         },
         "family": {
-          "title": "Family",
           "type": "string"
         },
         "kind": {
           "$ref": "#/$defs/DeviceKind"
         },
         "model_id": {
-          "title": "Model Id",
           "type": "string"
         }
       },
@@ -288,7 +263,8 @@
         "kind",
         "model_id",
         "family",
-        "display_name"
+        "display_name",
+        "aliases"
       ],
       "title": "DeviceInfo",
       "type": "object"
@@ -306,19 +282,16 @@
       "properties": {
         "attributes": {
           "additionalProperties": true,
-          "title": "Attributes",
           "type": "object"
         },
         "info": {
           "$ref": "#/$defs/DeviceInfo"
         },
         "revision": {
-          "title": "Revision",
           "type": "integer"
         },
         "updated_at": {
           "format": "date-time",
-          "title": "Updated At",
           "type": "string"
         }
       },
@@ -340,11 +313,9 @@
             "manual",
             "session"
           ],
-          "title": "Authority",
           "type": "string"
         },
         "citation": {
-          "title": "Citation",
           "type": "string"
         },
         "device_id": {
@@ -355,8 +326,7 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Device Id"
+          ]
         },
         "device_revision": {
           "anyOf": [
@@ -366,11 +336,9 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Device Revision"
+          ]
         },
         "evidence_id": {
-          "title": "Evidence Id",
           "type": "string"
         },
         "model_id": {
@@ -381,21 +349,17 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Model Id"
+          ]
         },
         "observed_at": {
           "format": "date-time",
-          "title": "Observed At",
           "type": "string"
         },
         "payload": {
           "additionalProperties": true,
-          "title": "Payload",
           "type": "object"
         },
         "plan_revision": {
-          "title": "Plan Revision",
           "type": "integer"
         },
         "source_type": {
@@ -404,11 +368,9 @@
             "manual",
             "session"
           ],
-          "title": "Source Type",
           "type": "string"
         },
         "task_id": {
-          "title": "Task Id",
           "type": "string"
         }
       },
@@ -451,8 +413,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Best Lead Time Ms"
+          "default": null
         },
         "first_card_ms": {
           "anyOf": [
@@ -463,8 +424,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "First Card Ms"
+          "default": null
         },
         "lead_time_ms": {
           "anyOf": [
@@ -475,20 +435,24 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Lead Time Ms"
+          "default": null
         },
         "tasks_refetched": {
           "default": 0,
-          "title": "Tasks Refetched",
           "type": "integer"
         },
         "tasks_reused": {
           "default": 0,
-          "title": "Tasks Reused",
           "type": "integer"
         }
       },
+      "required": [
+        "lead_time_ms",
+        "best_lead_time_ms",
+        "first_card_ms",
+        "tasks_reused",
+        "tasks_refetched"
+      ],
       "title": "Metrics",
       "type": "object"
     },
@@ -499,19 +463,15 @@
           "items": {
             "type": "string"
           },
-          "title": "Device Ids",
           "type": "array"
         },
         "label": {
-          "title": "Label",
           "type": "string"
         },
         "plan_id": {
-          "title": "Plan Id",
           "type": "string"
         },
         "task_count": {
-          "title": "Task Count",
           "type": "integer"
         }
       },
@@ -530,32 +490,26 @@
           "items": {
             "$ref": "#/$defs/Clause"
           },
-          "title": "Clauses",
           "type": "array"
         },
         "created_at": {
           "format": "date-time",
-          "title": "Created At",
           "type": "string"
         },
         "label": {
           "default": "",
-          "title": "Label",
           "type": "string"
         },
         "plan_id": {
-          "title": "Plan Id",
           "type": "string"
         },
         "revision": {
-          "title": "Revision",
           "type": "integer"
         },
         "tasks": {
           "items": {
             "$ref": "#/$defs/RetrievalTask"
           },
-          "title": "Tasks",
           "type": "array"
         }
       },
@@ -564,7 +518,8 @@
         "revision",
         "clauses",
         "tasks",
-        "created_at"
+        "created_at",
+        "label"
       ],
       "title": "QueryPlan",
       "type": "object"
@@ -572,7 +527,6 @@
     "RetrievalTask": {
       "properties": {
         "clause_id": {
-          "title": "Clause Id",
           "type": "string"
         },
         "depends_on_device_rev": {
@@ -584,8 +538,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Depends On Device Rev"
+          "default": null
         },
         "device_id": {
           "anyOf": [
@@ -595,8 +548,7 @@
             {
               "type": "null"
             }
-          ],
-          "title": "Device Id"
+          ]
         },
         "finished_ms": {
           "anyOf": [
@@ -607,8 +559,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Finished Ms"
+          "default": null
         },
         "kind": {
           "enum": [
@@ -616,7 +567,6 @@
             "manual",
             "session"
           ],
-          "title": "Kind",
           "type": "string"
         },
         "note": {
@@ -628,15 +578,12 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Note"
+          "default": null
         },
         "plan_revision": {
-          "title": "Plan Revision",
           "type": "integer"
         },
         "query": {
-          "title": "Query",
           "type": "string"
         },
         "started_ms": {
@@ -648,15 +595,13 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Started Ms"
+          "default": null
         },
         "status": {
           "$ref": "#/$defs/TaskStatus",
           "default": "pending"
         },
         "task_id": {
-          "title": "Task Id",
           "type": "string"
         }
       },
@@ -666,7 +611,12 @@
         "kind",
         "device_id",
         "query",
-        "plan_revision"
+        "plan_revision",
+        "depends_on_device_rev",
+        "status",
+        "started_ms",
+        "finished_ms",
+        "note"
       ],
       "title": "RetrievalTask",
       "type": "object"
@@ -679,11 +629,9 @@
             "manual",
             "session"
           ],
-          "title": "Kind",
           "type": "string"
         },
         "label": {
-          "title": "Label",
           "type": "string"
         },
         "observed_at": {
@@ -696,13 +644,13 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Observed At"
+          "default": null
         }
       },
       "required": [
         "kind",
-        "label"
+        "label",
+        "observed_at"
       ],
       "title": "Source",
       "type": "object"
@@ -711,7 +659,6 @@
       "description": "A highlighted stretch of the transcript, for the live transcript view.",
       "properties": {
         "end": {
-          "title": "End",
           "type": "integer"
         },
         "role": {
@@ -722,11 +669,9 @@
             "correction",
             "pronoun"
           ],
-          "title": "Role",
           "type": "string"
         },
         "start": {
-          "title": "Start",
           "type": "integer"
         }
       },
@@ -754,7 +699,6 @@
       "properties": {
         "detail": {
           "additionalProperties": true,
-          "title": "Detail",
           "type": "object"
         },
         "kind": {
@@ -774,11 +718,9 @@
             "resume",
             "command"
           ],
-          "title": "Kind",
           "type": "string"
         },
         "t_ms": {
-          "title": "T Ms",
           "type": "integer"
         }
       },

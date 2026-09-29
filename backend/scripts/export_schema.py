@@ -14,8 +14,21 @@ MODELS = [
 ]  # fmt: skip
 
 
+def _drop_field_titles(node: object) -> None:
+    """Field titles make json2ts emit one alias per field (DeviceId1, DeviceId2...). Model titles stay."""
+    if isinstance(node, dict):
+        for field in node.get("properties", {}).values():
+            field.pop("title", None)
+        for value in node.values():
+            _drop_field_titles(value)
+    elif isinstance(node, list):
+        for item in node:
+            _drop_field_titles(item)
+
+
 def build_schema() -> dict[str, object]:
     _, schema = models_json_schema([(model, "serialization") for model in MODELS], ref_template="#/$defs/{model}")
+    _drop_field_titles(schema)
     return {
         "title": "ProcastoContracts",
         "type": "object",

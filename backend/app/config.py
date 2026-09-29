@@ -13,7 +13,8 @@ DATA_DIR = BACKEND_DIR / "data"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=(BACKEND_DIR.parent / ".env", ".env"), extra="ignore")
+    # Only the repo's own .env. Reading one from the current directory could pick up another project's keys.
+    model_config = SettingsConfigDict(env_file=BACKEND_DIR.parent / ".env", extra="ignore")
 
     device_provider: Literal["sim", "smartthings"] = "sim"
     llm_provider: Literal["fake", "gemini"] = "fake"
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
     llm_timeout_ms: int = 1500
     dense_search: bool = True
     sim_seed: int = 7
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    cors_origins: list[str] = ["http://localhost:5180", "http://127.0.0.1:5180"]
 
 
 def load_devices(path: Path = DATA_DIR / "devices.yaml") -> tuple[list[DeviceInfo], dict[str, dict[str, Any]]]:

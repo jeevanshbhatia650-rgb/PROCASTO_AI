@@ -1,0 +1,25 @@
+# The simulated home. Aliases feed the clause extractor; model_id filters manuals.
+devices:
+  - device_id: washer-01
+    kind: washer
+    model_id: WW90T
+    family: washer
+    display_name: Washer
+    aliases: [washer, washing machine, laundry, wash]
+    initial: {state: RUNNING, remaining_min: 14, power_w: 450, error_code: null, temp_c: 40.0}
+
+  - device_id: dryer-01
+    kind: dryer
+    model_id: DV90T
+    family: dryer
+    display_name: Dryer
+    aliases: [dryer, drier, tumble dryer]
+    initial: {state: IDLE, remaining_min: 0, power_w: 2, error_code: null}
+
+  - device_id: ac-01
+    kind: ac
+    model_id: AR12
+    family: ac
+    display_name: AC
+    aliases: [ac, a/c, a c, air conditioner, air conditioning, aircon, air con]
+    initial: {state: COOLING, power_w: 1800, temp_c: 26.0, target_temp_c: 22.0, error_code: null}

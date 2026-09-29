@@ -1,0 +1,19 @@
+{
+  "title": "PROCASTO-AI in 20 seconds",
+  "steps": [
+    {"at_ms": 0, "type": "hood", "open": false},
+    {"at_ms": 0, "type": "caption", "text": "The home is live. The washer is running with 14 minutes left."},
+    {"at_ms": 1600, "type": "hood", "open": true},
+    {"at_ms": 1600, "type": "caption", "text": "Ask a question. Retrieval starts while you're still talking."},
+    {"at_ms": 2000, "type": "say", "text": "How long until the washer finishes and what temperature is it washing at", "ms_per_word": 280},
+    {"at_ms": 4200, "type": "caption", "text": "The washer faults mid-sentence. The answer rewrites itself."},
+    {"at_ms": 4200, "type": "sim", "scenario": "washer_e3"},
+    {"at_ms": 7600, "type": "caption", "text": "It explains the fault from the WW90T manual. Now interrupt it."},
+    {"at_ms": 10600, "type": "barge_in"},
+    {"at_ms": 10600, "type": "say", "text": "Wait I meant the dryer", "ms_per_word": 260},
+    {"at_ms": 10600, "type": "caption", "text": "Correction: the washer question is parked, not thrown away."},
+    {"at_ms": 14800, "type": "say", "text": "OK go back to the washer", "ms_per_word": 260},
+    {"at_ms": 14800, "type": "caption", "text": "Resume: fresh evidence is reused, stale readings are fetched again."},
+    {"at_ms": 18600, "type": "caption", "text": "Proof: retrieval started before you finished speaking."}
+  ]
+}

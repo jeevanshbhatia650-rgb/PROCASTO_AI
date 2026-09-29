@@ -1,0 +1,841 @@
+{
+  "$defs": {
+    "AnswerCard": {
+      "properties": {
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "card_id": {
+          "title": "Card Id",
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CardCommand"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "device_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Device Id"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_revision": {
+          "title": "Plan Revision",
+          "type": "integer"
+        },
+        "severity": {
+          "default": "info",
+          "enum": [
+            "ok",
+            "info",
+            "warn",
+            "error"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "speakable": {
+          "title": "Speakable",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/CardType"
+        }
+      },
+      "required": [
+        "card_id",
+        "type",
+        "device_id",
+        "title",
+        "body",
+        "evidence_ids",
+        "plan_revision",
+        "speakable",
+        "plan_id"
+      ],
+      "title": "AnswerCard",
+      "type": "object"
+    },
+    "CardCommand": {
+      "description": "A device command the user can confirm from a card.",
+      "properties": {
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id",
+        "command",
+        "label"
+      ],
+      "title": "CardCommand",
+      "type": "object"
+    },
+    "CardType": {
+      "enum": [
+        "status",
+        "problem",
+        "action",
+        "info",
+        "confirm"
+      ],
+      "title": "CardType",
+      "type": "string"
+    },
+    "Clause": {
+      "properties": {
+        "clause_id": {
+          "title": "Clause Id",
+          "type": "string"
+        },
+        "device_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Device Id"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "first_seen_ms": {
+          "title": "First Seen Ms",
+          "type": "integer"
+        },
+        "intent": {
+          "$ref": "#/$defs/Intent"
+        },
+        "origin": {
+          "default": "user",
+          "enum": [
+            "user",
+            "auto"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        },
+        "stable": {
+          "default": false,
+          "title": "Stable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "clause_id",
+        "device_id",
+        "intent",
+        "first_seen_ms"
+      ],
+      "title": "Clause",
+      "type": "object"
+    },
+    "DeviceEvent": {
+      "description": "Normalized event. Simulator and SmartThings must both emit this.",
+      "properties": {
+        "attribute": {
+          "enum": [
+            "state",
+            "remaining_min",
+            "power_w",
+            "error_code",
+            "temp_c",
+            "target_temp_c"
+          ],
+          "title": "Attribute",
+          "type": "string"
+        },
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "simulator",
+            "smartthings"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value"
+        }
+      },
+      "required": [
+        "event_id",
+        "device_id",
+        "attribute",
+        "value",
+        "observed_at",
+        "source"
+      ],
+      "title": "DeviceEvent",
+      "type": "object"
+    },
+    "DeviceInfo": {
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "family": {
+          "title": "Family",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DeviceKind"
+        },
+        "model_id": {
+          "title": "Model Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id",
+        "kind",
+        "model_id",
+        "family",
+        "display_name"
+      ],
+      "title": "DeviceInfo",
+      "type": "object"
+    },
+    "DeviceKind": {
+      "enum": [
+        "washer",
+        "dryer",
+        "ac"
+      ],
+      "title": "DeviceKind",
+      "type": "string"
+    },
+    "DeviceSnapshot": {
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "info": {
+          "$ref": "#/$defs/DeviceInfo"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "info",
+        "attributes",
+        "revision",
+        "updated_at"
+      ],
+      "title": "DeviceSnapshot",
+      "type": "object"
+    },
+    "Evidence": {
+      "properties": {
+        "authority": {
+          "enum": [
+            "simulator",
+            "smartthings",
+            "manual",
+            "session"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "citation": {
+          "title": "Citation",
+          "type": "string"
+        },
+        "device_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Device Id"
+        },
+        "device_revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Device Revision"
+        },
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model Id"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "plan_revision": {
+          "title": "Plan Revision",
+          "type": "integer"
+        },
+        "source_type": {
+          "enum": [
+            "live_state",
+            "manual",
+            "session"
+          ],
+          "title": "Source Type",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "task_id",
+        "source_type",
+        "device_id",
+        "model_id",
+        "authority",
+        "observed_at",
+        "device_revision",
+        "plan_revision",
+        "payload",
+        "citation"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Intent": {
+      "enum": [
+        "status",
+        "error_lookup",
+        "energy",
+        "action",
+        "resume",
+        "cancel"
+      ],
+      "title": "Intent",
+      "type": "string"
+    },
+    "Metrics": {
+      "properties": {
+        "best_lead_time_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Best Lead Time Ms"
+        },
+        "first_card_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Card Ms"
+        },
+        "lead_time_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lead Time Ms"
+        },
+        "tasks_refetched": {
+          "default": 0,
+          "title": "Tasks Refetched",
+          "type": "integer"
+        },
+        "tasks_reused": {
+          "default": 0,
+          "title": "Tasks Reused",
+          "type": "integer"
+        }
+      },
+      "title": "Metrics",
+      "type": "object"
+    },
+    "ParkedPlan": {
+      "description": "What the UI needs to show a parked plan and offer to resume it.",
+      "properties": {
+        "device_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Device Ids",
+          "type": "array"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "task_count": {
+          "title": "Task Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "plan_id",
+        "label",
+        "device_ids",
+        "task_count"
+      ],
+      "title": "ParkedPlan",
+      "type": "object"
+    },
+    "QueryPlan": {
+      "properties": {
+        "clauses": {
+          "items": {
+            "$ref": "#/$defs/Clause"
+          },
+          "title": "Clauses",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "label": {
+          "default": "",
+          "title": "Label",
+          "type": "string"
+        },
+        "plan_id": {
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/RetrievalTask"
+          },
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "plan_id",
+        "revision",
+        "clauses",
+        "tasks",
+        "created_at"
+      ],
+      "title": "QueryPlan",
+      "type": "object"
+    },
+    "RetrievalTask": {
+      "properties": {
+        "clause_id": {
+          "title": "Clause Id",
+          "type": "string"
+        },
+        "depends_on_device_rev": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Depends On Device Rev"
+        },
+        "device_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Device Id"
+        },
+        "finished_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished Ms"
+        },
+        "kind": {
+          "enum": [
+            "live_state",
+            "manual",
+            "session"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "plan_revision": {
+          "title": "Plan Revision",
+          "type": "integer"
+        },
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "started_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started Ms"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus",
+          "default": "pending"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "clause_id",
+        "kind",
+        "device_id",
+        "query",
+        "plan_revision"
+      ],
+      "title": "RetrievalTask",
+      "type": "object"
+    },
+    "Source": {
+      "properties": {
+        "kind": {
+          "enum": [
+            "live_state",
+            "manual",
+            "session"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        }
+      },
+      "required": [
+        "kind",
+        "label"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Span": {
+      "description": "A highlighted stretch of the transcript, for the live transcript view.",
+      "properties": {
+        "end": {
+          "title": "End",
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "device",
+            "intent",
+            "code",
+            "correction",
+            "pronoun"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "start": {
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "role"
+      ],
+      "title": "Span",
+      "type": "object"
+    },
+    "TaskStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "cancelled",
+        "parked",
+        "stale"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    },
+    "TimelineEvent": {
+      "properties": {
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "transcript",
+            "clause",
+            "task_start",
+            "task_done",
+            "task_cancel",
+            "task_park",
+            "park",
+            "stale_drop",
+            "device_event",
+            "invalidate",
+            "card",
+            "interrupt",
+            "resume",
+            "command"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "t_ms": {
+          "title": "T Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t_ms",
+        "kind",
+        "detail"
+      ],
+      "title": "TimelineEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "AnswerCard": {
+      "$ref": "#/$defs/AnswerCard"
+    },
+    "CardCommand": {
+      "$ref": "#/$defs/CardCommand"
+    },
+    "Clause": {
+      "$ref": "#/$defs/Clause"
+    },
+    "DeviceEvent": {
+      "$ref": "#/$defs/DeviceEvent"
+    },
+    "DeviceInfo": {
+      "$ref": "#/$defs/DeviceInfo"
+    },
+    "DeviceSnapshot": {
+      "$ref": "#/$defs/DeviceSnapshot"
+    },
+    "Evidence": {
+      "$ref": "#/$defs/Evidence"
+    },
+    "Metrics": {
+      "$ref": "#/$defs/Metrics"
+    },
+    "ParkedPlan": {
+      "$ref": "#/$defs/ParkedPlan"
+    },
+    "QueryPlan": {
+      "$ref": "#/$defs/QueryPlan"
+    },
+    "RetrievalTask": {
+      "$ref": "#/$defs/RetrievalTask"
+    },
+    "Source": {
+      "$ref": "#/$defs/Source"
+    },
+    "Span": {
+      "$ref": "#/$defs/Span"
+    },
+    "TimelineEvent": {
+      "$ref": "#/$defs/TimelineEvent"
+    }
+  },
+  "title": "ProcastoContracts",
+  "type": "object"
+}

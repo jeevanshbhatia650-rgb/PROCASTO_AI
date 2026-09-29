@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     smartthings_redirect_uri: str = "http://localhost:8000/auth/smartthings/callback"
     public_base_url: str = ""
     frontend_url: str = "http://localhost:5180"  # where the SmartThings login returns to
+    alexa_skill_id: str = ""  # optional: only answer requests for this skill
     # Commands always work on the simulator; real SmartThings devices need this opt-in.
     allow_commands: bool = False
     clause_stability_n: int = 2

@@ -160,6 +160,23 @@ async def test_llm_timeout_keeps_the_manuals_words(devices, bus, clock):
     assert "too late" not in todo.body
 
 
+class BrokenLLM:
+    name = "broken"
+
+    async def phrase(self, intent, facts, manual_text):
+        raise ConnectionError("provider is down")
+
+
+async def test_llm_outage_keeps_the_manuals_words(devices, bus, clock):
+    world = World(devices, bus, clock, llm=BrokenLLM())
+    await world.set("washer-01", state="ERROR", error_code="E3", remaining_min=14, power_w=0)
+    await world.run(world.engine.update([clause(Intent.ERROR_LOOKUP, code="E3")], "u1"))
+    await asyncio.sleep(0.01)
+    todo = next(c for c in world.cards() if c.type == CardType.ACTION)
+    assert todo.body.startswith("Clean the drain filter once a month")
+    assert todo.steps  # the facts and steps never depended on the LLM
+
+
 async def test_energy_card_suggests_a_warmer_target(world):
     await world.set("ac-01", state="COOLING", target_temp_c=18.0, temp_c=25.0, power_w=3200)
     await world.run(world.engine.update([clause(Intent.ENERGY, device="ac-01")], "u1"))

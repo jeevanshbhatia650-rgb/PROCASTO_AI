@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "session": {
+    "new": true,
+    "sessionId": "amzn1.echo-api.session.test-0001",
+    "application": {"applicationId": "amzn1.ask.skill.procasto-test"},
+    "user": {"userId": "amzn1.ask.account.test"}
+  },
+  "context": {"System": {"application": {"applicationId": "amzn1.ask.skill.procasto-test"}}},
+  "request": {
+    "type": "IntentRequest",
+    "requestId": "amzn1.echo-api.request.test-0001",
+    "timestamp": "REPLACED_BY_TEST",
+    "locale": "en-US",
+    "intent": {
+      "name": "ErrorCodeIntent",
+      "confirmationStatus": "NONE",
+      "slots": {
+        "device": {"name": "device", "value": "washer", "confirmationStatus": "NONE"},
+        "code": {"name": "code", "value": "E 3", "confirmationStatus": "NONE"}
+      }
+    }
+  }
+}

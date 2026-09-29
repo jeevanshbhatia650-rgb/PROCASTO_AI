@@ -32,3 +32,19 @@ Every entry is a state that was verified to work. Before changing a module liste
 - Researched (2026-09-29): signature scheme and payload shapes from SmartThingsCommunity/smartapp-sdk-nodejs (`lib/util/authorizer.js`, `lib/smart-app.js`, `test/data/lifecycles.js`) and the Enterprise eventing Authorization doc. Scopes `r:devices:*`, `x:devices:*` from the API Access App Setup doc. The OAuth endpoints (`https://api.smartthings.com/oauth/authorize`, `https://auth-global.api.smartthings.com/oauth/token`) could not be fetched from the live docs (JS-rendered, 404 to fetchers): confirm them in the Developer Workspace when registering the app.
 - Unverified: Samsung error-code capability names vary by model; `errorCode` / `*errorAndAlarmState` is a best-effort mapping.
 - How to try it: register an API Access app, set DEVICE_PROVIDER=smartthings, SMARTTHINGS_CLIENT_ID/SECRET, PUBLIC_BASE_URL (a tunnel to :8000), restart, click "Connect SmartThings".
+
+## [M11] LLM phrasing - WORKING with the template provider ✅, Gemini NOT verified live ⚠️ (2026-09-29)
+- Commit: `10b8691`
+- What works: `LLM_PROVIDER=fake` (default, deterministic) and `gemini` (REST, key in the `x-goog-api-key` header, never the URL). The composer shows the manual's own words immediately and swaps in the phrased sentence when it arrives; a timeout (1.5 s) or any provider error keeps the manual text.
+- Tests: `test_llm_provider.py` (mocked HTTP), `test_composer.py::test_llm_timeout_keeps_the_manuals_words`, `::test_llm_outage_keeps_the_manuals_words`.
+- Not done: local Jamba model (the plan marks it optional). No Gemini key was available to test live; the default model name `gemini-2.5-flash-lite` should be checked against current Gemini models.
+
+## [M12] Alexa adapter - WORKING against fixtures ✅, NOT run in the Alexa simulator ⚠️ (2026-09-29)
+- Commit: `10b8691`
+- What works: `POST /integrations/alexa` turns DeviceStatus/ErrorCode/Energy/Resume intents back into sentences and runs them through the same session pipeline; one engine session per Alexa session (10 min TTL); read-only; request timestamp (150 s) and optional `ALEXA_SKILL_ID` checks.
+- Tests: `test_alexa_adapter.py` (7).
+- Gap: no Alexa certificate-chain signature verification (required before certification). Alexa sends only final utterances, so no streaming or barge-in on this path.
+
+## [Serve] Single process - WORKING ✅ (2026-09-29)
+- Commit: `0fdfbe8`
+- After `npm --prefix frontend run build`, uvicorn serves the UI at `/` alongside `/api`, `/ws` and the integrations. Verified: `GET /` returns the app, `/healthz` and `/api/devices` still answer, 197 backend tests pass.

@@ -43,4 +43,5 @@ def render() -> str:
 
 
 if __name__ == "__main__":
-    Path(sys.argv[1]).write_text(render(), encoding="utf-8")
+    Path(sys.argv[1]).write_text(render(), encoding="utf-8", newline="
+")

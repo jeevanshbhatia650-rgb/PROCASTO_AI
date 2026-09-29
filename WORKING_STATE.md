@@ -24,3 +24,11 @@ Every entry is a state that was verified to work. Before changing a module liste
 - How to run: `make dev` (or backend `uvicorn app.main:create_app --factory --app-dir backend --port 8000` + `npm --prefix frontend run dev`), open http://localhost:5180.
 - Gotchas learned: hot-reloading `store.ts` in dev re-creates the store while the old socket keeps writing to the old one; reload the page. Production builds are unaffected.
 - Do NOT change without re-running: `src/lib/store.test.ts`, `src/hooks/speech.test.ts`, `src/lib/waterfall.test.ts`.
+
+## [M10] SmartThings adapter - WORKING against fixtures ✅, NOT verified against a real account ⚠️ (2026-09-29)
+- Commit: see `git log --grep "M10"`
+- What works (tested): capability mapping (washer/dryerOperatingState, powerMeter, temperatureMeasurement, thermostatCoolingSetpoint, airConditionerMode, switch, errorCode); webhook with HTTP Signature verification exactly like the official SDK (keyId -> https://key.smartthings.com{keyId}, PEM cert, rsa-sha256 over (request-target) digest date) plus our own Digest and Date (5 min) checks; PING echo; CONFIRMATION logged, never fetched (SSRF-safe, same as the SDK); OAuth2 code flow with one-time CSRF state; REST client (devices, status, commands, subscriptions) with id validation; provider binds one washer/dryer/AC by capability, loads state, subscribes, sends confirmed commands.
+- Tests passing: `test_smartthings_adapter.py` (13), `test_smartthings_api.py` (7); backend total 189.
+- Researched (2026-09-29): signature scheme and payload shapes from SmartThingsCommunity/smartapp-sdk-nodejs (`lib/util/authorizer.js`, `lib/smart-app.js`, `test/data/lifecycles.js`) and the Enterprise eventing Authorization doc. Scopes `r:devices:*`, `x:devices:*` from the API Access App Setup doc. The OAuth endpoints (`https://api.smartthings.com/oauth/authorize`, `https://auth-global.api.smartthings.com/oauth/token`) could not be fetched from the live docs (JS-rendered, 404 to fetchers): confirm them in the Developer Workspace when registering the app.
+- Unverified: Samsung error-code capability names vary by model; `errorCode` / `*errorAndAlarmState` is a best-effort mapping.
+- How to try it: register an API Access app, set DEVICE_PROVIDER=smartthings, SMARTTHINGS_CLIENT_ID/SECRET, PUBLIC_BASE_URL (a tunnel to :8000), restart, click "Connect SmartThings".

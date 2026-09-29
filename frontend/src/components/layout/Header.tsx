@@ -1,5 +1,6 @@
 import { useStore } from "../../lib/store";
 import { KeyboardIcon, LogoMark, SpeakerIcon } from "../icons";
+import { ConnectSmartThings } from "../controls/ConnectSmartThings";
 import { ReplayButton } from "../controls/ReplayButton";
 import { HoodToggle } from "./HoodToggle";
 
@@ -35,6 +36,7 @@ export function Header() {
           <span className="text-[13px] font-semibold tracking-tight">PROCASTO-AI</span>
           <span className="hidden text-white/55 lg:inline">It starts looking things up while you’re still talking.</span>
           <div className="ml-auto flex items-center gap-4 text-white/80">
+            <ConnectSmartThings />
             <ConnectionStatus />
             <span className="hidden md:inline" title="Who writes the explanation sentence on each card">
               Phrasing: {llm === "gemini" ? "Gemini" : "templates"}

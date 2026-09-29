@@ -1,0 +1,71 @@
+{
+  "lifecycle": "EVENT",
+  "executionId": "3070a655-2094-469b-a2c8-6f0ac70a175e",
+  "locale": "en-US",
+  "version": "0.1.0",
+  "eventData": {
+    "authToken": "redacted-in-fixture",
+    "installedApp": {
+      "installedAppId": "d46a1c60-b6bd-4f82-b124-028e0f14a4f4",
+      "locationId": "e1e66eab-1eab-4f09-9bb6-91da6585576d"
+    },
+    "events": [
+      {
+        "eventTime": "2026-09-29T12:00:00Z",
+        "eventType": "DEVICE_EVENT",
+        "deviceEvent": {
+          "eventId": "0eabc76a-c366-11e9-84dd-3bdf0e366b96",
+          "locationId": "e1e66eab-1eab-4f09-9bb6-91da6585576d",
+          "deviceId": "6cc2a018-a918-484e-a405-97838d874623",
+          "componentId": "main",
+          "capability": "samsungce.errorAndAlarmState",
+          "attribute": "errorCode",
+          "value": "E3",
+          "valueType": "string",
+          "stateChange": true,
+          "data": {},
+          "subscriptionName": "procasto_6cc2a018"
+        }
+      },
+      {
+        "eventTime": "2026-09-29T12:00:00Z",
+        "eventType": "DEVICE_EVENT",
+        "deviceEvent": {
+          "eventId": "1f2b3c4d-c366-11e9-84dd-3bdf0e366b96",
+          "locationId": "e1e66eab-1eab-4f09-9bb6-91da6585576d",
+          "deviceId": "6cc2a018-a918-484e-a405-97838d874623",
+          "componentId": "main",
+          "capability": "powerMeter",
+          "attribute": "power",
+          "value": 0,
+          "valueType": "number",
+          "stateChange": true,
+          "data": {},
+          "subscriptionName": "procasto_6cc2a018"
+        }
+      },
+      {
+        "eventTime": "2026-09-29T12:00:01Z",
+        "eventType": "DEVICE_EVENT",
+        "deviceEvent": {
+          "eventId": "2a3b4c5d-c366-11e9-84dd-3bdf0e366b96",
+          "locationId": "e1e66eab-1eab-4f09-9bb6-91da6585576d",
+          "deviceId": "99999999-0000-0000-0000-000000000000",
+          "componentId": "main",
+          "capability": "switch",
+          "attribute": "switch",
+          "value": "off",
+          "valueType": "string",
+          "stateChange": true,
+          "data": {},
+          "subscriptionName": "someone_else"
+        }
+      },
+      {
+        "eventTime": "2026-09-29T12:00:02Z",
+        "eventType": "TIMER_EVENT",
+        "timerEvent": {"eventId": "t1", "name": "poll", "type": "ONCE", "time": "2026-09-29T12:00:02Z"}
+      }
+    ]
+  }
+}

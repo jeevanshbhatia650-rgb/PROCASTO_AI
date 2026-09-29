@@ -20,10 +20,25 @@ def test_models_round_trip_through_json():
         clause,
         task,
         QueryPlan(plan_id="P1", revision=1, clauses=[clause], tasks=[task], created_at=NOW),
-        DeviceEvent(event_id="e1", device_id="washer-01", attribute="state", value="ERROR", observed_at=NOW,
-                    source="smartthings"),  # fmt: skip
-        AnswerCard(card_id="P1:washer-01:status", type=CardType.STATUS, device_id="washer-01", title="t", body="b",
-                   evidence_ids=["ev-T1"], plan_revision=1, speakable="s", plan_id="P1"),  # fmt: skip
+        DeviceEvent(
+            event_id="e1",
+            device_id="washer-01",
+            attribute="state",
+            value="ERROR",
+            observed_at=NOW,
+            source="smartthings",
+        ),  # fmt: skip
+        AnswerCard(
+            card_id="P1:washer-01:status",
+            type=CardType.STATUS,
+            device_id="washer-01",
+            title="t",
+            body="b",
+            evidence_ids=["ev-T1"],
+            plan_revision=1,
+            speakable="s",
+            plan_id="P1",
+        ),  # fmt: skip
         TimelineEvent(t_ms=12, kind="clause", detail={"clause_id": clause.clause_id}),
     ]
     for sample in samples:

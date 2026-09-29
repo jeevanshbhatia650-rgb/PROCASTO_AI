@@ -15,6 +15,7 @@ export type Hello = {
   provider: "simulator" | "smartthings";
   llm: string;
   dense_model: string | null;
+  smartthings_connected: boolean;
 };
 
 export type ClausesUpdate = {

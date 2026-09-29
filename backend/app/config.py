@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     smartthings_client_secret: str = ""
     smartthings_redirect_uri: str = "http://localhost:8000/auth/smartthings/callback"
     public_base_url: str = ""
+    frontend_url: str = "http://localhost:5180"  # where the SmartThings login returns to
     # Commands always work on the simulator; real SmartThings devices need this opt-in.
     allow_commands: bool = False
     clause_stability_n: int = 2

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import routes_manuals, routes_sim, ws
+from app.api import routes_manuals, routes_sim, routes_smartthings, ws
 from app.config import DATA_DIR, Settings, load_devices
 from app.context import AppContext
 from app.core.bus import Bus
@@ -82,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ws.router)
     app.include_router(routes_sim.router)
     app.include_router(routes_manuals.router)
+    app.include_router(routes_smartthings.router)
 
     @app.get("/healthz")
     async def healthz(request: Request) -> dict[str, object]:

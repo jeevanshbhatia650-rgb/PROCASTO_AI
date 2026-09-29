@@ -95,6 +95,7 @@ async def session_socket(websocket: WebSocket, session_id: str) -> None:
             "provider": "simulator" if ctx.simulator else "smartthings",
             "llm": ctx.llm.name,
             "dense_model": ctx.manuals.dense_model,
+            "smartthings_connected": getattr(ctx.provider, "connected", False),
         },
     )
     send("devices.snapshot", ctx.store.all())

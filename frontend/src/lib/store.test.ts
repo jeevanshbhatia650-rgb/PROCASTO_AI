@@ -52,7 +52,7 @@ describe("store reducer", () => {
   });
 
   it("remembers final utterances as turns, not partials", () => {
-    const base = { utterance_id: "U1", clauses: [], spans: [], is_correction: false };
+    const base = { utterance_id: "U1", clauses: [], spans: [], is_correction: false, mentions: [] };
     const s = apply(
       initialData,
       { type: "clauses.update", data: { ...base, text: "is the", final: false } },

@@ -156,6 +156,7 @@ class Session:
                 "clauses": ext.clauses,
                 "spans": ext.spans,
                 "is_correction": ext.is_correction,
+                "mentions": ext.stable_mentions,
             },
         )
         stable = [c for c in ext.clauses if c.stable]
@@ -191,7 +192,7 @@ class Session:
         utt.meta_done.add(intent.value)
         if intent == Intent.RESUME:
             utt.kind = "resume"
-            self._after_resume(self.engine.resume(device_id, self.evidence.for_task), device_id)
+            self._after_resume(self.engine.resume(device_id, self.evidence.for_task), device_id, from_speech=True)
         elif intent == Intent.CANCEL:
             utt.kind = "cancel"
             self.speech.interrupt("cancel")
@@ -200,7 +201,7 @@ class Session:
     async def on_resume_plan(self, plan_id: str) -> None:
         self._after_resume(self.engine.resume(None, self.evidence.for_task, plan_id=plan_id), None)
 
-    def _after_resume(self, diff: PlanDiff, device_id: str | None) -> None:
+    def _after_resume(self, diff: PlanDiff, device_id: str | None, from_speech: bool = False) -> None:
         if diff.resume_missed:
             self.timeline.emit("resume", device_id=device_id, missed=True)
             return
@@ -212,7 +213,7 @@ class Session:
             parked_plan_id=diff.parked_plan_id,
         )
         self.metrics.resumed(len(diff.reused), len(diff.refetched))
-        self.pipeline.apply(diff)
+        self.pipeline.apply(diff, from_speech=from_speech)
 
     # ---------- speech out ----------
 

@@ -15,8 +15,16 @@ export function TranscriptPanel() {
   const transcript = useStore((s) => s.transcript);
   const plan = useStore((s) => s.plan);
   const devices = useStore((s) => s.devices);
-  const clauses = transcript?.clauses ?? [];
+  const own = transcript?.clauses ?? [];
+  // "Wait, I meant the dryer" names only a device: the question itself carries over from the plan it replaced.
+  const mentions = transcript?.mentions ?? [];
+  const carried = own.length
+    ? []
+    : (plan?.clauses ?? []).filter((c) => c.origin === "user" && c.device_id && mentions.includes(c.device_id));
+  const clauses = own.length ? own : carried;
+  const empty = transcript?.is_correction ? "Correction heard. Listening for what you meant." : "Nothing yet. Start a sentence.";
   const name = (id: string | null) => (id ? devices[id]?.info.display_name : undefined);
+  const tag = (c: Clause) => (carried.length ? "carried over" : c.stable ? "stable" : "forming");
 
   return (
     <section className="card p-5" aria-label="What it understood">
@@ -29,7 +37,7 @@ export function TranscriptPanel() {
         {transcript?.is_correction && (
           <span className="rounded-full bg-primary/10 px-3 py-1 t-fine font-semibold text-primary">Correction</span>
         )}
-        {clauses.length === 0 && <span className="t-caption text-ink-48">Nothing yet. Start a sentence.</span>}
+        {clauses.length === 0 && <span className="t-caption text-ink-48">{empty}</span>}
         {clauses.map((clause) => (
           <span
             key={clause.clause_id}
@@ -39,7 +47,7 @@ export function TranscriptPanel() {
           >
             {name(clause.device_id) ?? "which device?"} · {INTENT_LABEL[clause.intent]}
             {clause.error_code ? ` ${clause.error_code}` : ""}
-            <span className={clause.stable ? "text-ok-dark" : "text-ink-48"}>{clause.stable ? "stable" : "forming"}</span>
+            <span className={clause.stable ? "text-ok-dark" : "text-ink-48"}>{tag(clause)}</span>
           </span>
         ))}
       </div>

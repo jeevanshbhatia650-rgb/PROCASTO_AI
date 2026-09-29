@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useNow } from "../../hooks/useNow";
 import { formatSeconds } from "../../lib/format";
+import { clearOf, FLIP_AT_PCT, labelWidth, placeLabels, type Side } from "../../lib/labels";
 import { useStore } from "../../lib/store";
 import { buildWaterfall, utterances, type Marker, type Waterfall } from "../../lib/waterfall";
 import type { TaskStatus } from "../../types/generated";
 
 const LABEL_W = 132;
-const CHAR_PX = 6.6; // average width of a 12px label character
-const LABEL_GAP_PX = 10;
-const FLIP_AT_PCT = 72;
+const FINISHED = "you finished";
 const MAX_BARS = 6;
 const BAR_COLOR: Record<TaskStatus, string> = {
   pending: "bg-white/30",
@@ -24,8 +23,6 @@ const TONE_COLOR: Record<Marker["tone"], string> = {
   park: "bg-primary-on-dark",
 };
 
-type Side = "right" | "left" | null;
-
 function useWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
@@ -37,23 +34,6 @@ function useWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
     return () => observer.disconnect();
   }, []);
   return [ref, width];
-}
-
-/**
- * Decides where each label goes so none overlap: to the right of its mark, flipped to the left near the
- * right edge, or hidden when there's no room. Marks (ticks, diamonds, dots) always show.
- */
-function placeLabels(positions: number[], labels: string[], widthPx: number): Side[] {
-  let freeFromPx = Number.NEGATIVE_INFINITY;
-  return positions.map((pct, i) => {
-    const x = (pct / 100) * widthPx;
-    const w = (labels[i]?.length ?? 0) * CHAR_PX + LABEL_GAP_PX;
-    const flip = pct > FLIP_AT_PCT;
-    const [from, to] = flip ? [x - w, x] : [x, x + w];
-    if (from < freeFromPx || from < 0 || to > widthPx + 4) return null;
-    freeFromPx = to;
-    return flip ? "left" : "right";
-  });
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -95,16 +75,26 @@ function Chart({ w, nowMs, live }: { w: Waterfall; nowMs: number; live: boolean 
   for (let t = origin; t <= w.end; t += step) ticks.push(t);
   const bars = w.bars.slice(-MAX_BARS);
   const firstStart = w.leadMs !== null && w.spokeEnd !== null ? w.spokeEnd - w.leadMs : null;
+  const px = (t: number) => (pct(t) / 100) * chartPx;
   const wordSides = placeLabels(w.words.map((x) => pct(x.t)), w.words.map((x) => x.text), chartPx);
-  const clauseSides = placeLabels(w.clauses.map((x) => pct(x.t)), w.clauses.map((x) => x.label), chartPx);
-  const eventSides = placeLabels(w.events.map((x) => pct(x.t)), w.events.map((x) => x.label), chartPx);
+  const clauseSides = placeLabels(w.clauses.map((x) => pct(x.t)), w.clauses.map((x) => x.label), chartPx, true);
+  const eventSides = placeLabels(w.events.map((x) => pct(x.t)), w.events.map((x) => x.label), chartPx, true);
   const endPct = w.spokeEnd !== null ? pct(w.spokeEnd) : null;
+  const endSide = endPct !== null && endPct > FLIP_AT_PCT ? "left" : "right";
+  // Axis labels make room for the "you finished" label instead of colliding with it.
+  const shownTicks = ticks.filter(
+    (t) => w.spokeEnd === null || clearOf(px(t), px(w.spokeEnd), labelWidth(FINISHED), endSide),
+  );
 
   return (
     <div ref={ref} className="relative mt-4">
       <Row label="">
-        {ticks.map((t) => (
-          <span key={t} className="t-fine tabular absolute top-1 -translate-x-1/2 text-white/35" style={{ left: `${pct(t)}%` }}>
+        {shownTicks.map((t) => (
+          <span
+            key={t}
+            className="t-fine tabular absolute top-1 -translate-x-1/2 whitespace-nowrap text-white/35"
+            style={{ left: `${pct(t)}%` }}
+          >
             {((t - origin) / 1000).toFixed(1)} s
           </span>
         ))}
@@ -143,9 +133,9 @@ function Chart({ w, nowMs, live }: { w: Waterfall; nowMs: number; live: boolean 
         {endPct !== null && (
           <div className="absolute inset-y-0 border-l border-dashed border-primary-on-dark" style={{ left: `${endPct}%` }}>
             <span
-              className={`t-fine absolute -top-1 whitespace-nowrap text-primary-on-dark ${endPct > FLIP_AT_PCT ? "right-1.5" : "left-1.5"}`}
+              className={`t-fine absolute -top-1 whitespace-nowrap text-primary-on-dark ${endSide === "left" ? "right-1.5" : "left-1.5"}`}
             >
-              you finished
+              {FINISHED}
             </span>
           </div>
         )}

@@ -51,6 +51,15 @@ async def test_demo_measures_lead_time_and_resume_reuse(env):
     assert metrics.best_lead_time_ms > 0  # retrieval started before the sentence ended
     assert metrics.tasks_reused >= 1  # the manual answer survived the detour
     assert metrics.tasks_refetched >= 1  # the washer's live reading changed while parked
+    assert metrics.lead_time_ms is not None  # the spoken "go back to the washer" refetch is timed too
+
+
+async def test_a_bare_correction_reports_the_device_it_named(env):
+    ctx, session, outbox = env
+    await run_demo(ctx, session, outbox)
+    correction = next(d for d in outbox.of("clauses.update") if d["is_correction"] and d["final"])
+    assert correction["clauses"] == []  # "wait I meant the dryer" has no question of its own...
+    assert correction["mentions"] == ["dryer-01"]  # ...so the UI shows the question carried over to this device
 
 
 async def test_demo_ends_back_on_the_washer_with_the_dryer_parked(env):

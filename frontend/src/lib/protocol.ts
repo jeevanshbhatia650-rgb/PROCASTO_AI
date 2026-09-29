@@ -25,6 +25,7 @@ export type ClausesUpdate = {
   clauses: Clause[];
   spans: Span[];
   is_correction: boolean;
+  mentions: string[]; // devices named after a correction marker ("wait, I meant the dryer")
 };
 
 export type SpeechSay = { text: string; card_id: string; priority: "normal" | "update" };

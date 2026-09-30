@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # Fernet key. SmartThings tokens are encrypted with it before they reach the database.
     token_encryption_key: str = ""
     max_demo_homes: int = 50  # simulated homes for signed-out visitors, one each
+    # Behind a reverse proxy you trust (Render, Fly: 1), rate limits key on the address that proxy saw.
+    trusted_proxy_hops: int = 0
     # Commands always work on the simulator; real SmartThings devices need this opt-in.
     allow_commands: bool = False
     clause_stability_n: int = 2

@@ -12,10 +12,11 @@ import type {
 
 export type Hello = {
   session_id: string;
-  provider: "simulator" | "smartthings";
+  home: "demo" | "smartthings";
+  signed_in: boolean;
+  notice: string; // why real devices aren't live right now, if they aren't
   llm: string;
   dense_model: string | null;
-  smartthings_connected: boolean;
 };
 
 export type ClausesUpdate = {
@@ -51,7 +52,11 @@ export type ServerMessage =
   | { type: "session.reset"; data: Empty }
   | { type: "error"; data: { message: string } };
 
+export type ScenarioId = "washer_e3" | "washer_done" | "ac_spike" | "dryer_done" | "reset";
+
 export type ClientMessage =
+  | { type: "auth"; data: { token: string | null } }
+  | { type: "sim.trigger"; data: { scenario: ScenarioId } }
   | { type: "transcript.partial" | "transcript.final"; data: { text: string; seq: number } }
   | { type: "speech.barge_in" | "speech.done"; data: Empty }
   | { type: "action.confirm"; data: { card_id: string; confirmed: boolean } }

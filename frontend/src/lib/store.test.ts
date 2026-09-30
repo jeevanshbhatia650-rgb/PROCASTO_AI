@@ -3,7 +3,7 @@ import type { AnswerCard, DeviceSnapshot, RetrievalTask } from "../types/generat
 import { initialData, reduce, type Data } from "./store";
 
 const snapshot = (id: string, attributes: Record<string, unknown>): DeviceSnapshot => ({
-  info: { device_id: id, kind: "washer", model_id: "WW90T", family: "washer", display_name: "Washer", aliases: [] },
+  info: { device_id: id, kind: "washer", model_id: "WW90T", family: "washer", display_name: "Washer", aliases: [], room: "Home" },
   attributes,
   revision: 1,
   updated_at: "2026-01-01T00:00:00Z",
@@ -31,6 +31,12 @@ describe("store reducer", () => {
     );
     expect(s.devices["washer-01"]?.attributes.state).toBe("ERROR");
     expect(Object.keys(s.devices)).toHaveLength(2);
+  });
+
+  it("clears the previous user's devices before a new session snapshot", () => {
+    const old = apply(initialData, { type: "devices.snapshot", data: [snapshot("old-home", {})] });
+    const next = apply(old, { type: "hello", data: { session_id: "s", home: "demo", signed_in: false, notice: "", llm: "templates", dense_model: null } });
+    expect(next.devices).toEqual({});
   });
 
   it("upserts and removes cards by id", () => {

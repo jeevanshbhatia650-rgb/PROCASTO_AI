@@ -17,6 +17,7 @@ from app.session.manager import Session
 
 MAX_REQUEST_AGE_S = 150  # Alexa's documented tolerance for request timestamps
 SESSION_TTL_S = 600
+MAX_SESSIONS = 200  # the session id comes from the request, so the table is capped
 TEMPLATES = {
     "DeviceStatusIntent": "what is {device} doing",
     "ErrorCodeIntent": "what does {code} mean on {device}",
@@ -69,6 +70,9 @@ class AlexaSessions:
             name = hashlib.sha256(alexa_session_id.encode()).hexdigest()[:24]
             session = Session(f"alexa-{name}", self.ctx, lambda _kind, _data: None)
         self._sessions[alexa_session_id] = (now, session)
+        while len(self._sessions) > MAX_SESSIONS:
+            oldest = min(self._sessions, key=lambda k: self._sessions[k][0])
+            await self._sessions.pop(oldest)[1].close()
         return session
 
     async def end(self, alexa_session_id: str) -> None:

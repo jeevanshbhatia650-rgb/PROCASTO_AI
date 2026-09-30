@@ -30,7 +30,7 @@ describe("event feed wording", () => {
 });
 
 const device = (kind: "washer" | "dryer" | "ac", attributes: Record<string, unknown>): DeviceSnapshot => ({
-  info: { device_id: `${kind}-01`, kind, model_id: "M", family: kind, display_name: kind === "ac" ? "AC" : kind[0]!.toUpperCase() + kind.slice(1), aliases: [] },
+  info: { device_id: `${kind}-01`, kind, model_id: "M", family: kind, display_name: kind === "ac" ? "AC" : kind[0]!.toUpperCase() + kind.slice(1), aliases: [], room: "Home" },
   attributes, revision: 1, updated_at: "2026-01-01T00:00:00Z",
 });
 

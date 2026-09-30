@@ -2,7 +2,7 @@
 
 from fastapi import HTTPException, Request
 
-from app.auth.verifier import AuthError, User
+from app.auth.verifier import AuthError, AuthUnavailable, User
 from app.services import Services
 
 
@@ -19,6 +19,8 @@ async def current_user(request: Request) -> User:
         raise HTTPException(401, "Sign in first.", headers={"WWW-Authenticate": "Bearer"})
     try:
         return await verifier.verify(token.strip())
+    except AuthUnavailable as exc:
+        raise HTTPException(503, "Sign-in is temporarily unavailable. Try again shortly.") from exc
     except AuthError as exc:
         raise HTTPException(
             401, "Your session expired. Sign in again.", headers={"WWW-Authenticate": "Bearer"}

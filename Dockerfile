@@ -24,5 +24,7 @@ COPY backend/data ./data
 # Bake the embedding model into the image: free hosts wipe the disk on every cold start.
 RUN python -c "from app.retrieval.embedder import FastEmbedEmbedder; FastEmbedEmbedder()"
 COPY --from=ui /ui/dist /app/frontend/dist
+RUN useradd --system --no-create-home procasto && chown -R procasto /app/.fastembed
+USER procasto
 EXPOSE 8000
-CMD ["sh", "-c", "exec uvicorn app.main:create_app --factory --app-dir /app/backend --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "exec uvicorn app.main:create_app --factory --app-dir /app/backend --host 0.0.0.0 --port ${PORT} --ws-max-size 65536"]

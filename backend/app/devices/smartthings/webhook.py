@@ -56,7 +56,8 @@ class WebhookHandler:
             return 400, {"error": "invalid JSON"}
         lifecycle = payload.get("lifecycle") if isinstance(payload, dict) else None
         if lifecycle == "PING":
-            return 200, {"pingData": {"challenge": payload.get("pingData", {}).get("challenge")}}
+            ping = payload.get("pingData")
+            return 200, {"pingData": {"challenge": ping.get("challenge") if isinstance(ping, dict) else None}}
         try:
             await self._verifier.verify(method, path, headers, body)
         except SignatureError as exc:

@@ -7,10 +7,11 @@ so any attribute named errorCode (or a capability ending in errorAndAlarmState) 
 """
 
 import math
+import re
 from datetime import datetime
 from typing import Any
 
-from app.core.models import DeviceKind
+from app.core.models import DeviceInfo, DeviceKind
 
 MACHINE_STATE = {"run": "RUNNING", "stop": "IDLE", "pause": "PAUSED"}
 COOLING_MODES = {"cool", "auto", "dry", "wind", "aiComfort"}
@@ -23,6 +24,33 @@ KIND_BY_CAPABILITY = {
 
 def detect_kind(capabilities: set[str]) -> DeviceKind | None:
     return next((kind for cap, kind in KIND_BY_CAPABILITY.items() if cap in capabilities), None)
+
+
+def discover_devices(items: list[dict[str, Any]], rooms: dict[str, str] | None = None) -> list[DeviceInfo]:
+    """Show every authorized device, even when its capabilities are new to PROCASTO."""
+    infos: list[DeviceInfo] = []
+    used: set[str] = set()
+    for item in items:
+        device_id = item.get("deviceId")
+        if not isinstance(device_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,64}", device_id) or device_id in used:
+            continue
+        used.add(device_id)
+        capabilities = {c.get("id") for comp in item.get("components", []) for c in comp.get("capabilities", [])}
+        kind = detect_kind(capabilities) or DeviceKind.OTHER
+        label = item.get("label") or item.get("name") or kind.value.title()
+        name = str(label)[:80]
+        infos.append(
+            DeviceInfo(
+                device_id=device_id,
+                kind=kind,
+                model_id=str(item.get("modelName") or item.get("deviceTypeName") or "")[:80],
+                family=kind.value,
+                display_name=name,
+                aliases=[kind.value] if kind != DeviceKind.OTHER else [],
+                room=(rooms or {}).get(item.get("roomId"), "My home"),
+            )
+        )
+    return infos
 
 
 def _minutes_until(value: Any, now: datetime) -> int | None:
@@ -46,8 +74,8 @@ def map_attribute(capability: str, attribute: str, value: Any, now: datetime) ->
         return [("temp_c", value)]
     if (capability, attribute) == ("thermostatCoolingSetpoint", "coolingSetpoint"):
         return [("target_temp_c", value)]
-    if (capability, attribute) == ("switch", "switch") and value == "off":
-        return [("state", "OFF")]
+    if (capability, attribute) == ("switch", "switch") and value in ("on", "off"):
+        return [("state", str(value).upper())]
     if (capability, attribute) == ("airConditionerMode", "airConditionerMode"):
         return [("state", "COOLING" if value in COOLING_MODES else str(value).upper())]
     if attribute == "errorCode" or capability.endswith("errorAndAlarmState"):

@@ -16,12 +16,19 @@ import jwt
 ALGORITHMS = ("ES256", "RS256")  # never HS256 or "none": the header can't pick a weaker check
 JWKS_TTL_S = 600
 MIN_REFETCH_S = 30  # unknown key ids can't make us hammer the JWKS endpoint
+RETRY_AFTER_FAILURE_S = 2
 LEEWAY_S = 30
 
 JwksFetcher = Callable[[], Awaitable[dict[str, Any]]]
 
 
 class AuthError(Exception):
+    pass
+
+
+class AuthUnavailable(Exception):
+    """The identity provider could not be checked; retry, do not sign the user out."""
+
     pass
 
 
@@ -52,6 +59,7 @@ class SupabaseVerifier:
         self._fetch, self._now = fetch, now
         self._keys: dict[str, jwt.PyJWK] = {}
         self._fetched_at = float("-inf")
+        self._fetch_failed = False
         self._lock = asyncio.Lock()
 
     async def verify(self, token: str) -> User:
@@ -63,6 +71,8 @@ class SupabaseVerifier:
         if alg not in ALGORITHMS:
             raise AuthError("unsupported token algorithm")
         key = await self._key(str(header.get("kid", "")))
+        if key.algorithm_name != alg:  # the key decides the algorithm, never the header
+            raise AuthError("token algorithm does not match its key")
         try:
             claims = jwt.decode(
                 token,
@@ -73,25 +83,27 @@ class SupabaseVerifier:
                 leeway=LEEWAY_S,
                 options={"require": ["exp", "iat", "sub", "aud", "iss"]},
             )
-        except jwt.InvalidTokenError as exc:
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
             raise AuthError("invalid or expired token") from exc
         if claims.get("role") != "authenticated" or not isinstance(claims.get("sub"), str):
             raise AuthError("not a signed-in user")
+        if claims.get("is_anonymous"):  # Supabase anonymous sign-ins are visitors, not accounts
+            raise AuthError("anonymous sessions have no home")
         return User(id=claims["sub"], email=str(claims.get("email", "")), token=token)
 
     async def _key(self, kid: str) -> jwt.PyJWK:
-        age = self._now() - self._fetched_at
-        if age > JWKS_TTL_S or (kid not in self._keys and age > MIN_REFETCH_S):
-            async with self._lock:
-                if self._now() - self._fetched_at > MIN_REFETCH_S:  # another caller may have just refreshed
-                    await self._refresh()
+        async with self._lock:  # a fetch already in flight answers everyone waiting on it
+            age = self._now() - self._fetched_at
+            if age > JWKS_TTL_S or (kid not in self._keys and age > MIN_REFETCH_S):
+                await self._refresh()
         key = self._keys.get(kid)
         if key is None:
+            if self._fetch_failed:
+                raise AuthUnavailable("identity keys are temporarily unavailable")
             raise AuthError("token signed by an unknown key")
         return key
 
     async def _refresh(self) -> None:
-        self._fetched_at = self._now()  # set first: a failing endpoint is retried at most every MIN_REFETCH_S
         try:
             body = await self._fetch()
             keys = {
@@ -99,6 +111,10 @@ class SupabaseVerifier:
                 for jwk in body.get("keys", [])
                 if jwk.get("kid") and jwk.get("alg") in ALGORITHMS
             }
+            if not keys:
+                raise ValueError("empty JWKS")
         except (httpx.HTTPError, ValueError, KeyError, jwt.PyJWKError):
-            return  # keep the keys we had; tokens signed by them still verify
-        self._keys = keys
+            self._fetch_failed = True  # keep the keys we had; tokens signed by them still verify
+            self._fetched_at = self._now() - MIN_REFETCH_S + RETRY_AFTER_FAILURE_S  # soon, not on every request
+            return
+        self._keys, self._fetch_failed, self._fetched_at = keys, False, self._now()

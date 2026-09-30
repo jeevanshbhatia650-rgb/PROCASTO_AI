@@ -4,6 +4,7 @@ The first message must be `auth`: a signed-in user's token opens their home, no 
 """
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -15,7 +16,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, ValidationError
 
-from app.auth.verifier import AuthError, User
+from app.api.guards import client_address
+from app.auth.verifier import AuthError, AuthUnavailable, User
 from app.context import AppContext
 from app.demo.replay import Replay, load_script
 from app.homes.registry import HomesFull, owner_for
@@ -26,6 +28,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 _SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 MAX_MESSAGES_PER_SECOND = 60
+MAX_MESSAGE_BYTES = 16_384
 AUTH_TIMEOUT_S = 10
 CLOSE_UNAUTHORIZED = 4401  # the app asks the user to sign in again
 CLOSE_BUSY = 1013
@@ -65,6 +68,14 @@ class Empty(BaseModel):
     pass
 
 
+async def _receive_capped(websocket: WebSocket) -> Any:
+    text = await websocket.receive_text()
+    if len(text) > MAX_MESSAGE_BYTES or len(text.encode("utf-8")) > MAX_MESSAGE_BYTES:
+        await websocket.close(code=1009, reason="message too large")
+        raise WebSocketDisconnect(1009)
+    return json.loads(text)
+
+
 async def _replay(session: Session, ctx: AppContext, send: Send, script_id: str) -> None:
     if ctx.simulator is None:
         send("error", {"message": "The scripted demo only runs on the demo home, not on your real devices."})
@@ -102,7 +113,7 @@ def _handlers(ctx: AppContext, session: Session, send: Send) -> Handlers:
 async def _authenticate(websocket: WebSocket, services: Services) -> tuple[str, User | None] | None:
     """Reads the `auth` message. Returns (home owner, user), or None after closing the socket."""
     try:
-        first = await asyncio.wait_for(websocket.receive_json(), AUTH_TIMEOUT_S)
+        first = await asyncio.wait_for(_receive_capped(websocket), AUTH_TIMEOUT_S)
         if not isinstance(first, dict) or first.get("type") != "auth":
             raise ValueError("expected auth")
         auth = AuthIn.model_validate(first.get("data") or {})
@@ -118,6 +129,9 @@ async def _authenticate(websocket: WebSocket, services: Services) -> tuple[str, 
         return None
     try:
         user = await services.verifier.verify(auth.token)
+    except AuthUnavailable:
+        await websocket.close(code=CLOSE_BUSY, reason="sign-in check unavailable; retry")
+        return None
     except AuthError:
         await websocket.close(code=CLOSE_UNAUTHORIZED, reason="sign in again")
         return None
@@ -132,7 +146,11 @@ async def _pump(websocket: WebSocket, queue: asyncio.Queue[dict[str, Any]]) -> N
 async def _serve(websocket: WebSocket, handlers: Handlers, send: Send) -> None:
     window_start, count = time.monotonic(), 0
     while True:
-        raw = await websocket.receive_json()
+        try:
+            raw = await _receive_capped(websocket)
+        except (json.JSONDecodeError, KeyError):  # KeyError: a binary frame instead of text
+            send("error", {"message": "send JSON text messages"})
+            continue
         now = time.monotonic()
         if now - window_start >= 1:
             window_start, count = now, 0
@@ -141,7 +159,7 @@ async def _serve(websocket: WebSocket, handlers: Handlers, send: Send) -> None:
             await websocket.close(code=1008, reason="too many messages")
             return
         kind = raw.get("type") if isinstance(raw, dict) else None
-        if kind not in handlers:
+        if not isinstance(kind, str) or kind not in handlers:
             send("error", {"message": f"unknown message type {kind!r}"})
             continue
         model, handle = handlers[kind]
@@ -166,10 +184,17 @@ async def session_socket(websocket: WebSocket, session_id: str) -> None:
         return
     owner, user = who
     try:
-        ctx = await services.homes.open(owner, user)
+        ctx = await services.homes.open(owner, user, client_address(websocket))
     except HomesFull as exc:
         await websocket.close(code=CLOSE_BUSY, reason=str(exc))
         return
+    try:  # from here on the home is ours, so it is released whatever happens
+        await _run_session(websocket, session_id, ctx, user)
+    finally:
+        await services.homes.release(owner, ctx)
+
+
+async def _run_session(websocket: WebSocket, session_id: str, ctx: AppContext, user: User | None) -> None:
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     def send(kind: str, data: Any) -> None:
@@ -177,23 +202,22 @@ async def session_socket(websocket: WebSocket, session_id: str) -> None:
 
     session = Session(session_id, ctx, send)
     pump = asyncio.create_task(_pump(websocket, queue))
-    send(
-        "hello",
-        {
-            "session_id": session_id,
-            "home": "demo" if ctx.simulator else "smartthings",
-            "signed_in": user is not None,
-            "notice": ctx.notice,
-            "llm": ctx.llm.name,
-            "dense_model": ctx.manuals.dense_model,
-        },
-    )
-    send("devices.snapshot", ctx.store.all())
     try:
+        send(
+            "hello",
+            {
+                "session_id": session_id,
+                "home": "demo" if ctx.simulator else "smartthings",
+                "signed_in": user is not None,
+                "notice": ctx.notice,
+                "llm": ctx.llm.name,
+                "dense_model": ctx.manuals.dense_model,
+            },
+        )
+        send("devices.snapshot", ctx.store.all())
         await _serve(websocket, _handlers(ctx, session, send), send)
     except WebSocketDisconnect:
         pass
     finally:
-        await session.close()
         pump.cancel()
-        await services.homes.release(owner, ctx)
+        await session.close()

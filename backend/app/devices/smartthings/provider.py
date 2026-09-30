@@ -25,6 +25,7 @@ class SmartThingsProvider:
         self, settings: Settings, devices: list[DeviceInfo], sink: EventSink, clock: Clock, http: httpx.AsyncClient
     ) -> None:
         self._http = http  # shared by the whole server, which closes it
+        self._infos = {d.device_id: d for d in devices}
         self._by_kind = {d.kind: d for d in devices}
         self._sink, self._clock = sink, clock
         self._public_url = settings.public_base_url.rstrip("/")
@@ -36,7 +37,7 @@ class SmartThingsProvider:
         return self._client is not None
 
     def devices(self) -> list[DeviceInfo]:
-        return list(self._by_kind.values())
+        return list(self._infos.values())
 
     def device_for(self, smartthings_id: str) -> str | None:
         return self._bindings.get(smartthings_id)
@@ -47,21 +48,24 @@ class SmartThingsProvider:
     async def stop(self) -> None:
         pass
 
-    async def connect(self, token: Token) -> dict[str, str]:
-        """Binds one real washer, dryer and AC by their capabilities, loads their state, subscribes to events."""
+    async def connect(self, token: Token, listed: list[dict[str, Any]] | None = None) -> dict[str, str]:
+        """Binds every discovered device, loads its state, and subscribes to events."""
         client = SmartThingsClient(token.access_token, self._http)
         bindings: dict[str, str] = {}
-        for item in await client.devices():
+        for item in listed if listed is not None else await client.devices():
             capabilities = {c["id"] for comp in item.get("components", []) for c in comp.get("capabilities", [])}
             kind = detect_kind(capabilities)
-            info = self._by_kind.get(kind) if kind else None
+            info = self._infos.get(item.get("deviceId")) or (self._by_kind.get(kind) if kind else None)
             if info and info.device_id not in bindings.values():
                 bindings[item["deviceId"]] = info.device_id
         self._client, self._bindings = client, bindings
         for smartthings_id, device_id in bindings.items():
-            await self._load_status(client, smartthings_id, device_id)
-            if token.installed_app_id and self._public_url:
-                await client.subscribe(token.installed_app_id, smartthings_id)
+            try:
+                await self._load_status(client, smartthings_id, device_id)
+                if token.installed_app_id and self._public_url:
+                    await client.subscribe(token.installed_app_id, smartthings_id)
+            except httpx.HTTPError as exc:
+                log.warning("SmartThings device %s status or subscription failed: %s", smartthings_id, exc)
         if not self._public_url:
             log.warning("PUBLIC_BASE_URL is empty: device states load once, but live events can't reach this server")
         return bindings

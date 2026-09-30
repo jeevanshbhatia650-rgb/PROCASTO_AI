@@ -14,7 +14,7 @@ export type Intent = "status" | "error_lookup" | "energy" | "action" | "resume" 
  * This interface was referenced by `ProcastoContracts`'s JSON-Schema
  * via the `definition` "DeviceKind".
  */
-export type DeviceKind = "washer" | "dryer" | "ac";
+export type DeviceKind = "washer" | "dryer" | "ac" | "other";
 export type TaskStatus = "pending" | "running" | "done" | "cancelled" | "parked" | "stale";
 /**
  * This interface was referenced by `ProcastoContracts`'s JSON-Schema
@@ -121,6 +121,7 @@ export interface DeviceInfo {
   family: string;
   kind: DeviceKind;
   model_id: string;
+  room: string;
 }
 /**
  * This interface was referenced by `ProcastoContracts`'s JSON-Schema

@@ -4,6 +4,7 @@ import { socket } from "../lib/ws";
 
 /** What the voice is saying right now. The microphone's echo guard compares against it. */
 export const speaking = { text: "" };
+let lastSpokenId = 0;
 
 const PREFERRED_VOICES = ["Samantha", "Google US English", "Microsoft Aria", "Microsoft Jenny", "Karen"];
 
@@ -27,6 +28,8 @@ export function useSpeech(): void {
   const stopSignal = useStore((s) => s.stopSpeech);
   const voiceOn = useStore((s) => s.voiceOn);
 
+  useEffect(() => () => stopSpeaking(), []);
+
   useEffect(() => {
     if (stopSignal > 0) stopSpeaking();
   }, [stopSignal]);
@@ -36,7 +39,9 @@ export function useSpeech(): void {
   }, [voiceOn]);
 
   useEffect(() => {
-    if (!speech || !voiceOn || !("speechSynthesis" in window)) return;
+    if (!speech || speech.id === lastSpokenId) return;
+    lastSpokenId = speech.id;
+    if (!voiceOn || !("speechSynthesis" in window)) return;
     const utterance = new SpeechSynthesisUtterance(speech.text);
     utterance.voice = pickVoice();
     utterance.rate = 1.04;

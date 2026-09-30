@@ -1,3 +1,4 @@
+import { Keyboard, Send } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import type { VoiceInput as Voice } from "../../hooks/useSpeechInput";
 import { sendTranscript } from "../../lib/ws";
@@ -13,6 +14,7 @@ interface VoiceInputProps {
 export function VoiceInput({ voice, draft, onDraft }: VoiceInputProps) {
   const lastSent = useRef("");
   const [focused, setFocused] = useState(false);
+  const [typing, setTyping] = useState(false);
 
   const onChange = (value: string) => {
     onDraft(value);
@@ -34,20 +36,23 @@ export function VoiceInput({ voice, draft, onDraft }: VoiceInputProps) {
 
   return (
     <>
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-7 flex flex-col items-center gap-3">
         <button
+          id="voice-button"
           type="button"
           onClick={toggleMic}
           disabled={!voice.supported}
           aria-pressed={voice.listening}
-          aria-label={voice.listening ? "Stop listening" : "Start listening"}
+          aria-label="Talk"
           title={voice.supported ? "Click, or hold Space, to talk" : "Voice needs Chrome or Edge. Typing streams the same way."}
-          className="pressable relative grid h-14 w-14 shrink-0 place-items-center rounded-full bg-primary text-white transition-[background-color,transform] duration-150 disabled:bg-chip disabled:text-ink-48"
+          className="pressable relative grid h-20 w-20 shrink-0 place-items-center rounded-full bg-ink text-white shadow-lg transition-[background-color,transform] duration-150 disabled:bg-chip disabled:text-ink-48"
         >
           {voice.listening && <span className="listening-ring absolute inset-0 rounded-full bg-primary" />}
-          <MicIcon size={24} className="relative" />
+          <MicIcon size={32} className="relative" />
         </button>
-        <form onSubmit={onSubmit} className="min-w-0 flex-1">
+        <p className="t-fine text-ink-48">{voice.listening ? "Tap to finish" : voice.supported ? "Tap to talk · hold Space" : "Voice is unavailable in this browser"}</p>
+        <button type="button" onClick={() => setTyping((open) => !open)} aria-expanded={typing} className="pressable inline-flex items-center gap-2 rounded-full px-4 py-2 t-caption text-ink-80 hover:bg-white/70"><Keyboard size={16} aria-hidden="true" /> {typing ? "Hide typing" : "Type instead"}</button>
+        {typing && <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-[640px] items-center gap-2">
           <label htmlFor="ask" className="sr-only">
             Ask about your home
           </label>
@@ -63,11 +68,9 @@ export function VoiceInput({ voice, draft, onDraft }: VoiceInputProps) {
               focused ? "border-primary-focus shadow-[0_0_0_4px_rgba(0,113,227,0.14)]" : "border-black/[0.08]"
             }`}
           />
-        </form>
+          <button type="submit" className="pressable grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-white" aria-label="Send question"><Send size={17} aria-hidden="true" /></button>
+        </form>}
       </div>
-      <p className="mt-2 hidden pl-[68px] t-fine text-ink-48 sm:block">
-        Every word streams to the engine as you talk or type. Hold Space to talk, press R for the 20-second demo.
-      </p>
     </>
   );
 }

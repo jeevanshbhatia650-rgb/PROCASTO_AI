@@ -63,6 +63,8 @@ class FakeCloud:
     def __init__(self) -> None:
         self.rows: dict[str, dict] = {}  # user id -> their connections row
         self.smartthings_up = True
+        self.devices_status = 200  # 401 = the user revoked PROCASTO's access at Samsung
+        self.saves_fail = False  # the connections table refuses writes
         self.token_grants: list[str] = []
         self.calls: list[tuple[str, str]] = []
 
@@ -83,6 +85,8 @@ class FakeCloud:
             self.token_grants.append(grant)
             return httpx.Response(200, json={"access_token": f"at-{len(self.token_grants)}", "refresh_token": "rt-2",
                                              "expires_in": 86400, "installed_app_id": INSTALLED_APP})  # fmt: skip
+        if path == "/v1/devices" and self.devices_status != 200:
+            return httpx.Response(self.devices_status, json={"error": "denied"})
         if path == "/v1/devices":
             capabilities = [{"id": "washerOperatingState"}, {"id": "powerMeter"}]
             return httpx.Response(200, json={"items": [{"deviceId": WASHER_ID, "components": [
@@ -104,6 +108,8 @@ class FakeCloud:
             row = self.rows.get(caller)
             return httpx.Response(200, json=[row] if row else [])
         if request.method == "POST":
+            if self.saves_fail:
+                return httpx.Response(503, json={"message": "database unavailable"})
             body = json.loads(request.content)
             if body.get("user_id") != caller:  # the insert policy's WITH CHECK
                 return httpx.Response(403, json={"message": "new row violates row-level security policy"})

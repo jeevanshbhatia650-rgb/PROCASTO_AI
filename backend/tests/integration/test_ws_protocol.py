@@ -115,3 +115,20 @@ def test_demo_homes_are_capped():
             assert closed.value.code == 1013
         with demo_session(small, "third-visitor") as (_, hello, _):  # the first home was released
             assert hello["data"]["home"] == "demo"
+
+
+def test_odd_frames_get_an_error_and_the_session_carries_on(client):
+    with demo_session(client, "odd-frames") as (ws, _, _):
+        ws.send_bytes(b"\x00\x01binary")
+        assert "JSON text" in read_until(ws, "error")[-1]["data"]["message"]
+        ws.send_json({"type": ["not", "a", "string"], "data": {}})
+        assert "unknown message type" in read_until(ws, "error")[-1]["data"]["message"]
+        assert ask(ws, "is the dryer done")["title"] == "Dryer · Idle"
+
+
+def test_the_api_explorer_is_not_public(client):
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        response = client.get(path)  # a 404, or the website's own "nothing here" page when the UI is built
+        if response.status_code != 404:
+            assert "text/html" in response.headers["content-type"]
+            assert "swagger" not in response.text.lower() and '"openapi"' not in response.text

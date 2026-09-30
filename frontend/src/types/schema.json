@@ -256,6 +256,10 @@
         },
         "model_id": {
           "type": "string"
+        },
+        "room": {
+          "default": "Home",
+          "type": "string"
         }
       },
       "required": [
@@ -264,7 +268,8 @@
         "model_id",
         "family",
         "display_name",
-        "aliases"
+        "aliases",
+        "room"
       ],
       "title": "DeviceInfo",
       "type": "object"
@@ -273,7 +278,8 @@
       "enum": [
         "washer",
         "dryer",
-        "ac"
+        "ac",
+        "other"
       ],
       "title": "DeviceKind",
       "type": "string"

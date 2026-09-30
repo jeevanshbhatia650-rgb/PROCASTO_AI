@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -5,11 +6,13 @@ from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.api.guards import client_address
 from app.api.web import SiteFiles, content_security_policy
 from app.connections.crypto import TokenBox
 from app.core.bus import Bus
 from app.devices.smartthings.oauth import Token
 from app.devices.smartthings.provider import SmartThingsProvider
+from app.devices.smartthings.webhook import WebhookHandler
 from app.homes.registry import HomeRegistry, HomesFull
 from app.state.live_store import LiveStore
 from tests.conftest import make_settings
@@ -57,7 +60,7 @@ class FakeProvider:
 
 def fake_maker(made):
     async def make(user):
-        home = SimpleNamespace(provider=FakeProvider(), user=user)
+        home = SimpleNamespace(provider=FakeProvider(), user=user, rebuild_after=None)
         made.append(home)
         return home
 
@@ -97,6 +100,25 @@ async def test_anonymous_homes_are_capped_but_signed_in_users_are_not():
     await homes.open("user:1", user="u1")  # accounts are rate limited by Supabase instead
 
 
+async def test_a_slow_owner_does_not_block_other_homes():
+    blocked = asyncio.Event()
+    started = asyncio.Event()
+
+    async def make(user):
+        if user == "slow":
+            started.set()
+            await blocked.wait()
+        return SimpleNamespace(provider=FakeProvider())
+
+    homes = HomeRegistry(make, max_anonymous=2)
+    slow = asyncio.create_task(homes.open("user:slow", user="slow"))
+    await started.wait()
+    fast = await asyncio.wait_for(homes.open("user:fast", user="fast"), timeout=0.2)
+    assert fast.provider.started == 1
+    blocked.set()
+    await slow
+
+
 async def test_webhook_events_reach_only_the_home_bound_to_that_device(devices, clock):
     cloud = FakeCloud()
     settings = make_settings(public_base_url="https://tunnel.example")
@@ -106,7 +128,7 @@ async def test_webhook_events_reach_only_the_home_bound_to_that_device(devices, 
         provider = SmartThingsProvider(settings, devices, store.apply, clock, cloud.client())
         if user == "owner":
             await provider.connect(TOKEN)  # binds the fake cloud's washer
-        return SimpleNamespace(provider=provider, store=store)
+        return SimpleNamespace(provider=provider, store=store, rebuild_after=None)
 
     homes = HomeRegistry(smartthings_home, max_anonymous=5)
     owner = await homes.open("user:owner", user="owner")
@@ -143,3 +165,50 @@ def test_a_forged_host_header_cannot_inject_into_the_policy():
     policy = content_security_policy("https://project.supabase.co", "evil.example; script-src *")
     assert "script-src *" not in policy and "wss://evil" not in policy
     assert "wss://site.example:8443" in content_security_policy("", "site.example:8443")
+
+
+async def test_a_stand_in_home_is_rebuilt_once_its_trouble_has_had_time_to_pass():
+    clock = [1000.0]
+    made = []
+
+    async def make(user):
+        home = SimpleNamespace(provider=FakeProvider(), rebuild_after=clock[0] + 30 if not made else None)
+        made.append(home)
+        return home
+
+    homes = HomeRegistry(make, max_anonymous=5, now=lambda: clock[0])
+    stand_in = await homes.open("user:1", user="u1")
+    assert await homes.open("user:1", user="u1") is stand_in  # still inside the retry window
+    clock[0] += 31
+    fresh = await homes.open("user:1", user="u1")
+    assert fresh is not stand_in and stand_in.provider.stopped == 0  # its two open tabs keep it until they close
+    await homes.release("user:1", stand_in)
+    await homes.release("user:1", stand_in)
+    assert stand_in.provider.stopped == 1 and fresh.provider.stopped == 0
+
+
+async def test_one_visitor_cannot_take_every_demo_slot():
+    homes = HomeRegistry(fake_maker([]), max_anonymous=10)
+    for i in range(4):
+        await homes.open(f"anon:{i}", client="198.51.100.7")
+    with pytest.raises(HomesFull, match="several demo tabs"):
+        await homes.open("anon:5", client="198.51.100.7")
+    await homes.open("anon:6", client="203.0.113.9")  # everyone else still gets in
+
+
+def test_behind_a_trusted_proxy_the_address_it_recorded_counts():
+    def conn(hops, forwarded, peer="10.0.0.2"):
+        settings = SimpleNamespace(trusted_proxy_hops=hops)
+        app = SimpleNamespace(state=SimpleNamespace(services=SimpleNamespace(settings=settings)))
+        return SimpleNamespace(app=app, headers={"x-forwarded-for": forwarded}, client=SimpleNamespace(host=peer))
+
+    spoofed = "6.6.6.6, 198.51.100.7"  # the visitor wrote 6.6.6.6; Render appended 198.51.100.7
+    assert client_address(conn(1, spoofed)) == "198.51.100.7"
+    assert client_address(conn(0, spoofed)) == "10.0.0.2"  # no proxy trusted: the direct peer
+    assert client_address(SimpleNamespace(client=SimpleNamespace(host="192.0.2.1"), headers={})) == "192.0.2.1"
+
+
+async def test_a_malformed_ping_is_answered_not_crashed_on():
+    handler = WebhookHandler(SimpleNamespace(), lambda payload: None, "https://example.test/webhooks/smartthings")
+    status, body = await handler.handle("POST", "/webhooks/smartthings", {}, b'{"lifecycle": "PING", "pingData": "x"}')
+    assert (status, body) == (200, {"pingData": {"challenge": None}})

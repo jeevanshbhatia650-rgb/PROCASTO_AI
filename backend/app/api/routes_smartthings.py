@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app.api.deps import get_services
 from app.api.guards import RateLimiter, read_capped
 from app.auth.verifier import User
-from app.devices.smartthings.oauth import OAuthError
+from app.devices.smartthings.oauth import OAuthError, OAuthUnavailable
 from app.devices.smartthings.webhook import MAX_BODY_BYTES
 from app.homes.registry import owner_for
 
@@ -30,24 +30,33 @@ async def callback(
     CALLBACK_LIMIT.check(request)
     services = get_services(request)
     back = f"{services.settings.frontend_url.rstrip('/')}/app/integrations?smartthings="
+    proof = request.cookies.get("st_oauth", "")
+
+    def land(result: str) -> RedirectResponse:
+        response = RedirectResponse(back + result)
+        response.delete_cookie("st_oauth", path="/auth/smartthings/callback")
+        return response
+
     if not services.smartthings_enabled or services.connections is None:
-        return RedirectResponse(back + "off")
+        return land("off")
     if error or not code:  # the user pressed Deny at Samsung
-        services.oauth.discard(state)
-        return RedirectResponse(back + "denied")
+        services.oauth.discard(state, proof)
+        return land("denied")
     try:
-        token, user = await services.oauth.exchange(code, state)
+        token, user = await services.oauth.exchange(code, state, proof)
+    except OAuthUnavailable:
+        return land("failed")  # Samsung hiccuped; nothing was saved
     except OAuthError:
-        return RedirectResponse(back + "expired")
+        return land("expired")
     if not isinstance(user, User):
-        return RedirectResponse(back + "expired")
+        return land("expired")
     try:
         await services.connections.save_smartthings(user, "Samsung account", services.box.seal(token))
     except httpx.HTTPError as exc:
         log.warning("saving the SmartThings connection for %r failed: %s", user, exc)
-        return RedirectResponse(back + "save_failed")
+        return land("save_failed")
     await services.homes.replace(owner_for(user))
-    return RedirectResponse(back + "connected")
+    return land("connected")
 
 
 @router.post("/webhooks/smartthings")

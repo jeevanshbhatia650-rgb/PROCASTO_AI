@@ -12,7 +12,7 @@ from app.connections.crypto import TokenBox
 from app.devices.smartthings.oauth import Token
 from app.homes.maker import NOT_REACHABLE, NOT_READABLE
 from app.main import create_app
-from tests.fake_cloud import ENCRYPTION_KEY, FakeCloud, cloud_settings, user_token
+from tests.fake_cloud import ENCRYPTION_KEY, WASHER_ID, FakeCloud, cloud_settings, user_token
 
 
 @pytest.fixture
@@ -109,8 +109,9 @@ def test_connect_smartthings_end_to_end(client, cloud):
 
     with signed_in(client, "after-connect") as (_, hello, devices):
         assert hello["home"] == "smartthings"
-        assert devices["washer-01"]["attributes"]["state"] == "RUNNING"
-        assert devices["washer-01"]["attributes"]["power_w"] == 431  # read from the real (fake) device
+        assert list(devices) == [WASHER_ID]  # real IDs, not the fixed demo ID
+        assert devices[WASHER_ID]["attributes"]["state"] == "RUNNING"
+        assert devices[WASHER_ID]["attributes"]["power_w"] == 431  # read from the real (fake) device
 
     assert client.delete("/api/connections/smartthings", headers=bearer()).json() == {"ok": True}
     assert "user-1" not in cloud.rows
@@ -126,6 +127,16 @@ def test_a_login_state_works_once_and_denials_land_softly(client):
     assert denied.headers["location"].endswith("smartthings=denied")
     replayed = client.get("/auth/smartthings/callback", params={"code": "c", "state": state}, follow_redirects=False)
     assert replayed.headers["location"].endswith("smartthings=expired")  # the denial used up the state
+
+
+def test_another_browser_cannot_finish_your_smartthings_login(client, cloud):
+    started = client.post("/api/connections/smartthings/start", headers=bearer()).json()
+    state = parse_qs(urlparse(started["authorize_url"]).query)["state"][0]
+    another = TestClient(client.app)  # same server state; no browser cookie
+    forged = another.get("/auth/smartthings/callback", params={"code": "victim-code", "state": state},
+                         follow_redirects=False)  # fmt: skip
+    assert forged.headers["location"].endswith("smartthings=expired")
+    assert "user-1" not in cloud.rows
 
 
 def test_an_unreadable_token_row_shows_the_demo_with_a_reason(client, cloud):
@@ -152,3 +163,36 @@ def test_an_expiring_token_is_renewed_and_saved(client, cloud):
         assert hello["home"] == "smartthings"
     assert cloud.token_grants[-1] == "refresh_token"
     assert box.open(cloud.rows["user-1"]["token_ciphertext"]).access_token == f"at-{len(cloud.token_grants)}"
+
+
+def test_samsung_failing_mid_login_lands_softly(client, cloud):
+    started = client.post("/api/connections/smartthings/start", headers=bearer())
+    state = parse_qs(urlparse(started.json()["authorize_url"]).query)["state"][0]
+    cloud.smartthings_up = False
+    landed = client.get("/auth/smartthings/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert landed.status_code == 307 and landed.headers["location"].endswith("smartthings=failed")
+    assert "user-1" not in cloud.rows
+
+
+def test_a_revoked_samsung_grant_asks_to_reconnect(client, cloud):
+    connect_smartthings(client)
+    cloud.devices_status = 401
+    with signed_in(client, "revoked") as (_, hello, _):
+        assert (hello["home"], hello["notice"]) == ("demo", NOT_READABLE)
+
+
+def test_a_renewed_login_survives_a_failed_save(client, cloud):
+    connect_smartthings(client)
+    box = TokenBox(ENCRYPTION_KEY)
+    old = box.open(cloud.rows["user-1"]["token_ciphertext"])
+    cloud.rows["user-1"]["token_ciphertext"] = box.seal(Token(old.access_token, old.refresh_token, time.time() + 60,
+                                                              old.installed_app_id))  # fmt: skip
+    cloud.saves_fail = True
+    with signed_in(client, "renew-unsaved") as (_, hello, _):
+        assert hello["home"] == "smartthings"  # the renewed login is used even though it couldn't be stored
+    renewed = f"at-{len(cloud.token_grants)}"
+    cloud.saves_fail = False
+    with signed_in(client, "renew-retry") as (_, hello, _):
+        assert hello["home"] == "smartthings"
+    assert box.open(cloud.rows["user-1"]["token_ciphertext"]).access_token == renewed
+    assert cloud.token_grants.count("refresh_token") == 1  # stored on the next visit, not renewed twice

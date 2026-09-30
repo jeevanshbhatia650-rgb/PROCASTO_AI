@@ -5,7 +5,7 @@ import { initialData, useStore } from "../../lib/store";
 import { TranscriptPanel } from "./TranscriptPanel";
 
 const dryer: DeviceSnapshot = {
-  info: { device_id: "dryer-01", kind: "dryer", model_id: "DV90T", family: "dryer", display_name: "Dryer", aliases: [] },
+  info: { device_id: "dryer-01", kind: "dryer", model_id: "DV90T", family: "dryer", display_name: "Dryer", aliases: [], room: "Home" },
   attributes: {},
   revision: 1,
   updated_at: "2026-01-01T00:00:00Z",

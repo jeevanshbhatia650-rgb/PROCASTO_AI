@@ -1,10 +1,11 @@
 """Public site config, and connecting or removing a signed-in user's SmartThings account."""
 
 import logging
+import secrets
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.api.deps import current_user, get_services
 from app.api.guards import RateLimiter
@@ -33,13 +34,24 @@ async def config(request: Request) -> dict[str, object]:
 
 
 @router.post("/connections/smartthings/start")
-async def start_smartthings(request: Request, user: SignedIn) -> dict[str, str]:
+async def start_smartthings(request: Request, response: Response, user: SignedIn) -> dict[str, str]:
     CONNECT_LIMIT.check(request)
     services = get_services(request)
     if not services.smartthings_enabled:
         raise HTTPException(409, "SmartThings isn't set up on this server yet.")
     try:
-        return {"authorize_url": services.oauth.login_url(user)}
+        proof = secrets.token_urlsafe(32)
+        url = services.oauth.login_url(user, proof)
+        response.set_cookie(
+            "st_oauth",
+            proof,
+            max_age=600,
+            path="/auth/smartthings/callback",
+            httponly=True,
+            secure=request.url.scheme == "https",
+            samesite="lax",
+        )
+        return {"authorize_url": url}
     except OAuthError as exc:
         raise HTTPException(429, str(exc)) from exc
 

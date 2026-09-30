@@ -21,17 +21,15 @@ function highlight(text: string, spans: Span[]) {
   return parts;
 }
 
-/** The sentence as it streams in, with the words the engine understood coloured by role. */
-export function LiveTranscript({ draft }: { draft: string }) {
+/** Under the hood only: the sentence as it streams in, with the words the engine understood coloured by role. */
+export function LiveTranscript() {
   const transcript = useStore((s) => s.transcript);
   const text = transcript?.text ?? "";
   const listening = transcript !== null && !transcript.final;
 
-  if (!text && !draft) {
-    return <p className="t-display text-ink/25">How long until the washer finishes?</p>;
-  }
+  if (!text) return <p className="t-caption text-ink-48">Nothing heard yet. Talk or type on the left.</p>;
   return (
-    <p className="t-display text-balance" aria-live="polite">
+    <p className="t-tagline text-balance">
       {highlight(text, transcript?.spans ?? []).map((part, i) =>
         part.role ? (
           <span key={i} className={ROLE_CLASS[part.role]}>

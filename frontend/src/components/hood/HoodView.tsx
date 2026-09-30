@@ -1,3 +1,4 @@
+import { LiveTranscript } from "../user/LiveTranscript";
 import { EventFeed } from "./EventFeed";
 import { LeadTimeBadge } from "./LeadTimeBadge";
 import { TaskList } from "./TaskList";
@@ -16,6 +17,13 @@ export function HoodView() {
           <div className="mt-3">
             <Timeline />
           </div>
+        </div>
+      </section>
+      <section className="card p-5" aria-label="What it heard">
+        <h3 className="t-caption-strong">What it heard</h3>
+        <p className="t-fine mt-0.5 text-ink-48">Your words as they arrive. Coloured words are the ones it understood.</p>
+        <div className="mt-3">
+          <LiveTranscript />
         </div>
       </section>
       <TranscriptPanel />

@@ -20,6 +20,7 @@ class DeviceKind(StrEnum):
     WASHER = "washer"
     DRYER = "dryer"
     AC = "ac"
+    OTHER = "other"
 
 
 class DeviceInfo(Contract):
@@ -29,6 +30,7 @@ class DeviceInfo(Contract):
     family: str  # manual fallback when no exact model manual exists
     display_name: str
     aliases: list[str] = Field(default_factory=list)
+    room: str = "Home"  # groups devices on the dashboard, like rooms in SmartThings and Home Assistant
 
 
 Attribute = Literal["state", "remaining_min", "power_w", "error_code", "temp_c", "target_temp_c"]

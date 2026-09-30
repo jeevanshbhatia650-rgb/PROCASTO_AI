@@ -1,3 +1,4 @@
+import { Plug } from "lucide-react";
 import type { ReactNode, SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
@@ -75,23 +76,12 @@ export const PauseIcon = (p: IconProps) => (
     <path d="M9 6v12M15 6v12" />
   </Icon>
 );
-export const KeyboardIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <rect x="3" y="6" width="18" height="12" rx="2.5" />
-    <path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8" />
-  </Icon>
-);
 
 export function DeviceIcon({ kind, ...p }: IconProps & { kind: string }) {
   if (kind === "washer") return <WasherIcon {...p} />;
   if (kind === "dryer") return <DryerIcon {...p} />;
-  return <AcIcon {...p} />;
+  if (kind === "ac") return <AcIcon {...p} />;
+  return <Plug size={p.size ?? 18} className={p.className} aria-hidden="true" />;
 }
 
 /** The PROCASTO mark: a pulse line (original artwork). */
-export const LogoMark = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-    <rect width="32" height="32" rx="8" fill="#1d1d1f" />
-    <path d="M5 17h5l3-7 4 13 3-9 2 3h5" fill="none" stroke="#2997ff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);

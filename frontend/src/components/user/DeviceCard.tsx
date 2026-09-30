@@ -1,34 +1,10 @@
 import type { DeviceSnapshot } from "../../types/generated";
-import { formatPower, formatTemp } from "../../lib/format";
+import { deviceView, type Tone } from "../../lib/deviceView";
 import { DeviceIcon } from "../icons";
 
-const SPIKE_W = 2500;
 const METER_MAX_W = 3500;
 
-type View = { value: string; status: string; tone: "ok" | "run" | "bad" | "off" | "warn" };
-
-function view(snapshot: DeviceSnapshot): View {
-  const a = snapshot.attributes as Record<string, number | string | null | undefined>;
-  const power = a.power_w as number | undefined;
-  if (a.error_code) return { value: "Stopped", status: `Error ${a.error_code} · ${formatPower(power)}`, tone: "bad" };
-  if (snapshot.info.kind === "ac") {
-    if (a.state === "OFF") return { value: "Off", status: `Room ${formatTemp(a.temp_c as number)}`, tone: "off" };
-    const spike = power !== undefined && power > SPIKE_W;
-    return {
-      value: formatPower(power),
-      status: `Cooling to ${formatTemp(a.target_temp_c as number)} · room ${formatTemp(a.temp_c as number)}`,
-      tone: spike ? "warn" : "ok",
-    };
-  }
-  if (a.state === "RUNNING") {
-    const water = a.temp_c != null ? ` · ${formatTemp(a.temp_c as number)}` : "";
-    return { value: `${a.remaining_min} min`, status: `Running · ${formatPower(power)}${water}`, tone: "run" };
-  }
-  if (a.state === "DONE") return { value: "Done", status: "Cycle finished", tone: "ok" };
-  return { value: a.state === "IDLE" ? "Idle" : String(a.state ?? "…"), status: `Standby · ${formatPower(power)}`, tone: "off" };
-}
-
-const DOT: Record<View["tone"], string> = {
+const DOT: Record<Tone, string> = {
   ok: "bg-ok",
   run: "bg-ok",
   warn: "bg-run",
@@ -37,7 +13,7 @@ const DOT: Record<View["tone"], string> = {
 };
 
 export function DeviceCard({ snapshot }: { snapshot: DeviceSnapshot }) {
-  const v = view(snapshot);
+  const v = deviceView(snapshot);
   const dark = v.tone === "bad";
   const power = Number(snapshot.attributes.power_w ?? 0);
   return (

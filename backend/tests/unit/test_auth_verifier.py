@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 
@@ -6,7 +7,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from jwt.algorithms import ECAlgorithm
 
-from app.auth.verifier import AuthError, SupabaseVerifier
+from app.auth.verifier import AuthError, AuthUnavailable, SupabaseVerifier
 
 URL = "https://project.supabase.co"
 ISSUER = f"{URL}/auth/v1"
@@ -105,3 +106,68 @@ async def test_a_failing_jwks_endpoint_keeps_the_keys_we_had():
     verifier._fetch = down
     clock[0] += 700  # past the cache lifetime
     assert (await verifier.verify(token())).id == "user-1"
+
+
+async def test_initial_jwks_outage_requests_a_retry_instead_of_sign_out():
+    clock = [1000.0]
+    calls = [0]
+
+    async def flaky():
+        calls[0] += 1
+        if calls[0] == 1:
+            raise ValueError("temporarily down")
+        return {"keys": [jwk(KEY)]}
+
+    verifier = SupabaseVerifier(URL, flaky, now=lambda: clock[0])
+    with pytest.raises(AuthUnavailable):
+        await verifier.verify(token())
+    with pytest.raises(AuthUnavailable):
+        await verifier.verify(token())
+    assert calls[0] == 1
+    clock[0] += 31
+    assert (await verifier.verify(token())).id == "user-1"
+
+
+async def test_tabs_connecting_during_the_first_key_fetch_all_get_in():
+    fetches = [0]
+
+    async def slow():
+        fetches[0] += 1
+        await asyncio.sleep(0.05)
+        return {"keys": [jwk(KEY)]}
+
+    verifier = SupabaseVerifier(URL, slow)
+    users = await asyncio.gather(*(verifier.verify(token()) for _ in range(3)))
+    assert [u.id for u in users] == ["user-1"] * 3 and fetches[0] == 1
+
+
+async def test_a_failed_key_fetch_is_retried_within_seconds_not_half_a_minute():
+    clock = [1000.0]
+    calls = [0]
+
+    async def flaky():
+        calls[0] += 1
+        if calls[0] == 1:
+            raise ValueError("temporarily down")
+        return {"keys": [jwk(KEY)]}
+
+    verifier = SupabaseVerifier(URL, flaky, now=lambda: clock[0])
+    with pytest.raises(AuthUnavailable):
+        await verifier.verify(token())
+    clock[0] += 3
+    assert (await verifier.verify(token())).id == "user-1"
+
+
+async def test_a_header_that_disagrees_with_its_key_is_refused_cleanly():
+    def part(data: dict) -> str:
+        return jwt.utils.base64url_encode(json.dumps(data).encode()).decode()
+
+    # RS256 in the header, while kid k1 is our ES256 key: hand-built, as an attacker would send it.
+    forged = f"{part({'alg': 'RS256', 'kid': 'k1'})}.{part({'sub': 'x'})}.c2lnbmF0dXJl"
+    with pytest.raises(AuthError):  # an AuthError, never a TypeError that becomes a 500
+        await SupabaseVerifier(URL, Jwks(jwk(KEY))).verify(forged)
+
+
+async def test_anonymous_supabase_sessions_are_not_accounts():
+    with pytest.raises(AuthError):
+        await SupabaseVerifier(URL, Jwks(jwk(KEY))).verify(token(is_anonymous=True))

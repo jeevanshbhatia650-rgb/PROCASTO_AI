@@ -62,6 +62,9 @@ def status_text(name: str, kind: DeviceKind, attrs: dict[str, Any]) -> CardText:
         left = attrs.get("remaining_min")
         body = f"It was {left} min from done. Power is {fmt_power(power)}." if left else f"Power is {fmt_power(power)}."
         return CardText(f"{name} stopped · Error {code}", body, f"The {said} stopped with error {code}.", "error")
+    if kind == DeviceKind.OTHER and state == "UNKNOWN" and power is None:
+        return CardText(f"{name} is connected", "No supported live reading has arrived yet.",
+                        f"The {said} is connected, but has not reported a live reading yet.")  # fmt: skip
     if kind == DeviceKind.AC:
         target, temp = attrs.get("target_temp_c"), attrs.get("temp_c")
         if state == "OFF":
@@ -70,16 +73,18 @@ def status_text(name: str, kind: DeviceKind, attrs: dict[str, Any]) -> CardText:
         return CardText(
             f"{name} · Cooling to {fmt_temp(target)}",
             f"Room at {fmt_temp(temp)}, drawing {fmt_power(power)}.",
-            f"The {said} is cooling to {target:g} degrees and drawing {spoken_power(power)}.",
+            f"The {said} is cooling"
+            + (f" to {target:g} degrees" if target is not None else "")
+            + f" and drawing {spoken_power(power)}.",
             "warn" if spike else "ok",
         )
     if state == "RUNNING":
         left, water = attrs.get("remaining_min"), attrs.get("temp_c")
         at = f" at {fmt_temp(water)}" if water is not None else ""
         return CardText(
-            f"{name} · {left} min left",
+            f"{name} · {left} min left" if left is not None else f"{name} · Running",
             f"Running{at}, drawing {fmt_power(power)}.",
-            f"The {said} has {left} minutes left.",
+            f"The {said} has {left} minutes left." if left is not None else f"The {said} is running.",
             "ok",
         )
     if state == "DONE":

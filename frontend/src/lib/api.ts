@@ -1,6 +1,8 @@
+import type { ScenarioId } from "./protocol";
 import { useStore } from "./store";
+import { socket } from "./ws";
 
-export type ScenarioId = "washer_e3" | "washer_done" | "ac_spike" | "dryer_done" | "reset";
+export type { ScenarioId };
 
 export const SCENARIOS: { id: ScenarioId; label: string; tone: "bad" | "warn" | "ok" | "neutral" }[] = [
   { id: "washer_e3", label: "Washer E3", tone: "bad" },
@@ -10,19 +12,9 @@ export const SCENARIOS: { id: ScenarioId; label: string; tone: "bad" | "warn" | 
   { id: "reset", label: "Reset", tone: "neutral" },
 ];
 
-/** F2: the break-something panel. */
-export async function triggerScenario(scenario: ScenarioId): Promise<void> {
-  try {
-    const response = await fetch("/api/sim/trigger", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenario }),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { detail?: string };
-      useStore.getState().showToast(body.detail ?? "That didn't work. Is the backend running?");
-    }
-  } catch {
-    useStore.getState().showToast("Can't reach the backend. Start it with `make dev-back`.");
+/** F2: break something in your own demo home. It travels over your socket, so it can't reach anyone else's. */
+export function triggerScenario(scenario: ScenarioId): void {
+  if (!socket.send({ type: "sim.trigger", data: { scenario } })) {
+    useStore.getState().showToast("Not connected yet. Try again in a second.");
   }
 }

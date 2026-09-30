@@ -45,7 +45,8 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         yield
         await services.close()
 
-    app = FastAPI(title="PROCASTO-AI", lifespan=lifespan)
+    # No public API explorer: /docs, /redoc and /openapi.json would map every route for anyone.
+    app = FastAPI(title="PROCASTO-AI", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.middleware("http")(security_headers(settings.supabase_url))
     app.add_middleware(
         CORSMiddleware,

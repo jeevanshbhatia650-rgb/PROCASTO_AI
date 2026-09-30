@@ -2,6 +2,7 @@
 
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -26,7 +27,27 @@ class SmartThingsClient:
         return response.json() if response.content else {}
 
     async def devices(self) -> list[dict[str, Any]]:
-        return (await self._request("GET", "/devices")).get("items", [])
+        items: list[dict[str, Any]] = []
+        path = "/devices"
+        seen: set[str] = set()
+        while path and path not in seen and len(seen) < 100:
+            seen.add(path)
+            body = await self._request("GET", path)
+            items.extend(body.get("items", []))
+            href = body.get("_links", {}).get("next", {}).get("href")
+            if not href:
+                break
+            url = urlsplit(href)
+            if url.scheme != "https" or url.netloc != "api.smartthings.com" or url.path != "/v1/devices":
+                raise ValueError("SmartThings returned an unsafe device page URL")
+            path = "/devices" + (f"?{url.query}" if url.query else "")
+        return items
+
+    async def rooms(self, location_id: str) -> dict[str, str]:
+        body = await self._request("GET", f"/locations/{_checked(location_id)}/rooms")
+        return {
+            room["roomId"]: room["name"] for room in body.get("items", []) if room.get("roomId") and room.get("name")
+        }
 
     async def status(self, device_id: str) -> dict[str, Any]:
         body = await self._request("GET", f"/devices/{_checked(device_id)}/status")

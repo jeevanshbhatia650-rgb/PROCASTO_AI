@@ -32,9 +32,13 @@ export type Data = {
   voiceOn: boolean;
   toast: { id: number; message: string } | null;
   clockOffset: number; // Date.now() minus the server's session clock, to place "now" on the timeline
+  power: number[]; // whole-home watts, one sample every POWER_SAMPLE_MS, oldest first
 };
 
 const MAX_TIMELINE = 500;
+export const POWER_SAMPLE_MS = 3000;
+export const MAX_POWER_SAMPLES = 40;
+const EMPTY_POWER: number[] = [];
 const MAX_TASKS = 60;
 const EMPTY_METRICS: Metrics = {
   lead_time_ms: null,
@@ -63,7 +67,13 @@ export const initialData: Data = {
   voiceOn: true,
   toast: null,
   clockOffset: 0,
+  power: EMPTY_POWER,
 };
+
+const SESSION_RESET = {
+  transcript: null, turns: [], plan: null, parked: [], tasks: {}, cards: {}, timeline: [],
+  metrics: EMPTY_METRICS, speech: null, demo: null, power: EMPTY_POWER,
+} satisfies Partial<Data>;
 
 let counter = 0;
 const nextId = () => ++counter;
@@ -77,6 +87,15 @@ function withTask(tasks: Record<string, RetrievalTask>, task: RetrievalTask): Re
   return next;
 }
 
+export function totalPower(devices: Record<string, DeviceSnapshot>): number {
+  return Object.values(devices).reduce((sum, d) => sum + (Number(d.attributes.power_w) || 0), 0);
+}
+
+/** Sampled on a clock, not on updates: a quiet home still draws a line, and every step is the same length of time. */
+export function withPowerSample(power: number[], devices: Record<string, DeviceSnapshot>): number[] {
+  return [...power.slice(-(MAX_POWER_SAMPLES - 1)), totalPower(devices)];
+}
+
 function without<T>(record: Record<string, T>, key: string): Record<string, T> {
   const next = { ...record };
   delete next[key];
@@ -86,8 +105,8 @@ function without<T>(record: Record<string, T>, key: string): Record<string, T> {
 /** Pure: server message in, state changes out. */
 export function reduce(state: Data, msg: ServerMessage, receivedAt = Date.now()): Partial<Data> {
   switch (msg.type) {
-    case "hello":
-      return { hello: msg.data };
+    case "hello": // a new server session: nothing from the previous one still applies
+      return { ...SESSION_RESET, devices: {}, stopSpeech: state.stopSpeech + 1, hello: msg.data };
     case "devices.snapshot":
       return { devices: Object.fromEntries(msg.data.map((d) => [d.info.device_id, d])) };
     case "device.update":
@@ -119,10 +138,7 @@ export function reduce(state: Data, msg: ServerMessage, receivedAt = Date.now())
     case "ui.hood":
       return { hoodOpen: msg.data.open };
     case "session.reset":
-      return {
-        transcript: null, turns: [], plan: null, parked: [], tasks: {}, cards: {}, timeline: [],
-        metrics: EMPTY_METRICS, speech: null, stopSpeech: state.stopSpeech + 1,
-      };
+      return { ...SESSION_RESET, stopSpeech: state.stopSpeech + 1 };
     case "error":
       return { toast: { id: nextId(), message: msg.data.message } };
   }
@@ -134,6 +150,8 @@ type Actions = {
   setHood: (open: boolean) => void;
   toggleVoice: () => void;
   showToast: (message: string) => void;
+  samplePower: () => void;
+  clearPrivate: () => void;
 };
 
 export const useStore = create<Data & Actions>()((set) => ({
@@ -143,4 +161,7 @@ export const useStore = create<Data & Actions>()((set) => ({
   setHood: (hoodOpen) => set({ hoodOpen }),
   toggleVoice: () => set((state) => ({ voiceOn: !state.voiceOn })),
   showToast: (message) => set({ toast: { id: nextId(), message } }),
+  samplePower: () =>
+    set((state) => (Object.keys(state.devices).length ? { power: withPowerSample(state.power, state.devices) } : state)),
+  clearPrivate: () => set((state) => ({ ...initialData, connection: "closed", stopSpeech: state.stopSpeech + 1 })),
 }));

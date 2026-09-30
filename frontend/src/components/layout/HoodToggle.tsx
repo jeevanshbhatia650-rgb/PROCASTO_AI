@@ -9,10 +9,11 @@ export function HoodToggle() {
       type="button"
       role="switch"
       aria-checked={open}
+      aria-label="Under the hood"
       onClick={() => setHood(!open)}
       className="group flex items-center gap-2.5 t-caption text-ink-80"
     >
-      <span className="hidden sm:inline">Under the hood</span>
+      <span aria-hidden="true">Under the hood</span>
       <span
         className={`relative inline-flex h-[26px] w-[44px] shrink-0 items-center rounded-full transition-colors duration-200 ${
           open ? "bg-primary" : "bg-chip"

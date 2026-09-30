@@ -29,3 +29,4 @@ class AppContext:
     lexicon: Lexicon
     commands: CommandGate
     notice: str = ""  # shown to the user, e.g. why their real devices aren't live right now
+    rebuild_after: float | None = None  # wall clock; the next visit after this builds a fresh home

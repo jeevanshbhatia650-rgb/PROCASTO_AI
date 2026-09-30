@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
 import { sendTranscript, socket } from "../lib/ws";
 import { speaking, stopSpeaking } from "./useSpeech";
@@ -86,5 +86,15 @@ export function useSpeechInput(): VoiceInput {
 
   const stop = useCallback(() => recognition.current?.stop(), []);
 
-  return { supported: Boolean(Ctor), listening, start, stop };
+  useEffect(() => () => {
+    const rec = recognition.current;
+    if (rec) {
+      rec.onresult = null;
+      rec.onend = null;
+      rec.stop();
+      recognition.current = null;
+    }
+  }, []);
+
+  return useMemo(() => ({ supported: Boolean(Ctor), listening, start, stop }), [Ctor, listening, start, stop]);
 }

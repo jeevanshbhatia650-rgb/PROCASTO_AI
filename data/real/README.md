@@ -28,6 +28,35 @@ the key is `(appliance_type, market, code)`.
 Suggested embedding text per row: `"{appliance_type} {code}: {meaning}. {what_to_do or fix_steps}"`, and keep `code`
 and `appliance_type` as filters so a dryer question never returns a washer answer.
 
+## How to embed the data
+
+Use **fastembed** with the `BAAI/bge-small-en-v1.5` model (133 MB, downloads on first run):
+
+```python
+from fastembed import SparseEmbedding, FlagModel
+import csv
+
+# Load the embedding model (downloads once to ~/.cache/)
+model = FlagModel("BAAI/bge-small-en-v1.5", cache_dir="/path/to/cache")
+
+# Read your CSV and embed each row
+embeddings = []
+with open("samsung_washer_faults.csv") as f:
+    for row in csv.DictReader(f):
+        text = f"{row['appliance_type']} {row['code']}: {row['meaning']}. {row['what_to_do']}"
+        embedding = model.embed(text)  # returns numpy array, shape (384,)
+        embeddings.append({
+            "code": row["code"],
+            "appliance_type": row["appliance_type"],
+            "embedding": embedding.tolist()  # convert to list for storage
+        })
+
+# Store embeddings in your vector DB (e.g., Supabase pgvector, Milvus, Weaviate)
+# Index by (appliance_type, code) to filter by device type before search
+```
+
+**Why this model:** 384 dimensions, fast on CPU, 0.3 MB/batch on typical hardware, semantic cache reuse at cosine ≥ 0.60 works well. Dense search is optional — BM25 alone (no embeddings) works too.
+
 ## Sources and licences (keep these with the data)
 
 - **ha-samsung-washer-local**, commit `b75ef1e`, MIT licence:

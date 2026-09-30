@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     dense_search: bool = True
     sim_seed: int = 7
     cors_origins: list[str] = ["http://localhost:5180", "http://127.0.0.1:5180"]
+    cors_origin_regex: str = ""  # e.g. a hosted front end with preview URLs: ^https://procasto[a-z0-9-]*\.vercel\.app$
 
 
 def load_devices(path: Path = DATA_DIR / "devices.yaml") -> tuple[list[DeviceInfo], dict[str, dict[str, Any]]]:

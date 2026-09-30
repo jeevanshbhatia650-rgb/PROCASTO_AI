@@ -1,3 +1,5 @@
+import { apiHeaders, apiUrl } from "./backend";
+
 /** What the server says this deployment supports. Read once; the same build works on any deployment. */
 export type SiteConfig = {
   accounts: boolean;
@@ -10,7 +12,7 @@ export type SiteConfig = {
 let pending: Promise<SiteConfig> | null = null;
 
 export function loadConfig(): Promise<SiteConfig> {
-  pending ??= fetch("/api/config")
+  pending ??= fetch(apiUrl("/api/config"), { headers: apiHeaders })
     .then((response) => {
       if (!response.ok) throw new Error(`config request failed (${response.status})`);
       return response.json() as Promise<SiteConfig>;

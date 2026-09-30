@@ -1,3 +1,4 @@
+import { apiHeaders, apiUrl } from "./backend";
 import { freshToken, requireSupabase } from "./supabase";
 
 const SMARTTHINGS_LOGIN = "https://api.smartthings.com/oauth/authorize?";
@@ -15,7 +16,7 @@ export async function listConnections(): Promise<Connection[]> {
 async function authorized(path: string, method: "POST" | "DELETE"): Promise<Response> {
   const token = await freshToken(OAUTH_ROUND_TRIP_S);
   if (!token) throw new Error("Your session expired. Sign in again.");
-  const response = await fetch(path, { method, headers: { Authorization: `Bearer ${token}` } });
+  const response = await fetch(apiUrl(path), { method, headers: { ...apiHeaders, Authorization: `Bearer ${token}` } });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { detail?: string };
     throw new Error(body.detail ?? `Request failed (${response.status}).`);

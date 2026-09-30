@@ -52,7 +52,8 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["content-type", "authorization"],
+        allow_origin_regex=settings.cors_origin_regex or None,
+        allow_headers=["content-type", "authorization", "ngrok-skip-browser-warning"],
     )
     app.include_router(ws.router)
     app.include_router(routes_account.router)

@@ -1,3 +1,4 @@
+import { socketUrl } from "./backend";
 import type { ClientMessage, ServerMessage } from "./protocol";
 import { useStore } from "./store";
 
@@ -51,8 +52,7 @@ class Socket {
 
   private connect(): void {
     if (this.ws && this.ws.readyState !== WebSocket.CLOSED) return; // StrictMode runs effects twice
-    const scheme = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${scheme}://${location.host}/ws/session/${this.sessionId}`);
+    const ws = new WebSocket(socketUrl(`/ws/session/${this.sessionId}`));
     this.ws = ws;
     useStore.getState().setConnection("connecting");
     ws.onopen = async () => {

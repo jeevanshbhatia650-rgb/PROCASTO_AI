@@ -7,6 +7,8 @@ __pycache__/
 htmlcov/
 node_modules/
 frontend/dist/
+frontend/dist-vercel/
+frontend/.vercel/
 frontend/coverage/
 .env
 *.log

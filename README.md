@@ -15,9 +15,10 @@ Engineering and Technology
 
 ![The PROCASTO home: one room at a time, live power, follow switches](docs/screenshots/home.jpg)
 
-> The website is hosted on Vercel; the live engine (WebSockets, simulator, agents) runs on the team's machine and is
-> reached through a tunnel during judging. If the demo shows "Connecting…", the engine is offline: run it locally in
-> two commands ([below](#run-it-locally)).
+> Always on: the website is on Vercel and the engine (WebSockets, simulator, agents, vector database) on Render,
+> kept awake by a [GitHub Action](.github/workflows/keep-engine-awake.yml). Nothing runs on a team laptop. If the
+> demo ever shows "Connecting…" for long, the engine is waking up (about a minute), or run it locally in two
+> commands ([below](#run-it-locally)).
 
 ---
 
@@ -122,7 +123,7 @@ most once per run, and never without a yes.
 | Accounts and data | **Supabase** (Auth, Postgres with row-level security), Fernet encryption |
 | Devices | **Samsung SmartThings API** (OAuth, webhooks with signature checks), a device simulator |
 | Quality | pytest, vitest, Testing Library, **Playwright** (real-browser checks), ruff, ESLint, knip, vulture |
-| Deploy and media | **Vercel** (website), Docker / Render (engine), ngrok (tunnel), **Remotion** (the film) |
+| Deploy and media | **Vercel** (website), **Render** (engine, Docker, free plan), GitHub Actions (keep-awake), **Remotion** (the film) |
 
 ## Run it locally
 
@@ -169,7 +170,9 @@ http://localhost:8000. Or `docker build -t procasto . && docker run -p 8000:8000
 
 **Hosting the website on Vercel:** build with `VITE_BACKEND_URL=<engine URL> npx vite build --outDir dist-vercel` in
 `frontend/`, copy [`frontend/deploy/vercel.json`](frontend/deploy/vercel.json) into it, and deploy that folder. The
-engine needs a host with WebSockets (Render via [`render.yaml`](render.yaml), or any Docker host).
+engine needs a host with WebSockets: [deploy it to Render](https://render.com/deploy?repo=https://github.com/jeevanshbhatia650-rgb/PROCASTO_AI)
+from [`render.yaml`](render.yaml) (paste `GEMINI_API_KEY`, everything else is set; it fits the free 512 MB plan at
+about 320 MB), or any Docker host.
 
 ## Tests
 

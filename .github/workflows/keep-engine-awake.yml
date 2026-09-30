@@ -1,0 +1,16 @@
+name: Keep the engine awake
+
+# Render's free plan sleeps after 15 idle minutes and takes about a minute to wake: a judge shouldn't wait.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS --max-time 90 --retry 2 https://procasto-ai.onrender.com/healthz

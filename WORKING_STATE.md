@@ -96,7 +96,7 @@ Every entry is a state that was verified to work. Before changing a module liste
 - Re-run the ingest: `cd backend && uv run python -m scripts.ingest_samsung_faults` (refuses if the upstream file or licence changed).
 
 ## [Film] 90-second promo video - WORKING ✅ (2026-09-30)
-- Remotion project in `video/` (13 scenes, 1920x1080, 30 fps, 91 s). Real app captures in `video/public/shot-*.png` (made with the scratchpad `video_shots.py` against the dev server); the SmartThings connect and follow sequences are animated and labelled "Illustration with sample devices"; end card says not affiliated with Samsung.
-- Render: `cd video && npx remotion render Promo out/procasto-promo.mp4`. Web copy (720p, faststart, ~2.5 MB) and poster in `frontend/public/media/`.
+- Remotion project in `video/` (13 scenes, 1920x1080, 30 fps, 92 s). Music: `video/public/music.mp3` ("lo-fi beat", zephiramusic, chosen by the user); every cut is snapped to its 76 BPM beat and Connect lands where the drums return. Real app captures in `video/public/shot-*.png` (made with the scratchpad `video_shots.py` against the dev server); the SmartThings connect and follow sequences are animated and labelled "Illustration with sample devices"; end card says not affiliated with Samsung.
+- Render: `cd video && npx remotion render Promo out/procasto-promo.mp4`. Web copy with music (720p, faststart, ~4 MB) and poster in `frontend/public/media/`.
 - On the site: "See it in 90 seconds" section right after the hero plus a link under the hero buttons; plays muted only while on screen, never autoplays with reduced motion. Served with range requests (206).
 - Gotcha: OneDrive marks folders with a reparse point that Node sees as a symlink, so Remotion can't copy a folder inside `public/`. Keep public assets flat.

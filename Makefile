@@ -6,7 +6,7 @@ PY := backend/.venv/bin/python
 BIN := backend/.venv/bin
 endif
 
-.PHONY: setup dev dev-back dev-front test test-unit test-int test-fe lint deadcode types demo
+.PHONY: setup dev dev-back dev-front test test-unit test-int test-fe e2e lint deadcode types demo
 
 setup:
 	cd backend && uv sync --extra dense
@@ -31,6 +31,9 @@ test-int:
 
 test-fe:
 	npm --prefix frontend test
+
+e2e:
+	uv run --no-project --with playwright python e2e/smoke.py http://localhost:8000
 
 lint:
 	$(BIN)/ruff check backend/app backend/tests

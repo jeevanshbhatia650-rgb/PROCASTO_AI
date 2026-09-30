@@ -1,14 +1,116 @@
-# PROCASTO-AI
+# PROCASTO · Your home, explained
 
-**A smart-home assistant that starts looking things up while you're still talking.**
+**A voice assistant for the Samsung SmartThings home that answers from live device state and that model's manual,
+starts looking things up before you finish speaking, and keeps up when you change your mind.**
 
-Ask "how long until the washer finishes…" and before you finish the sentence it has already read the washer's live state. If the washer faults mid-sentence, the answer rewrites itself. Say "wait, I meant the dryer" and the washer question is parked, not thrown away; "go back to the washer" brings it back, re-using what's still fresh and re-fetching only what changed. Every answer cites where it came from and how fresh it is.
+Samsung PRISM Generative AI Hackathon, 3rd edition (2026–27) · Theme 4: Streaming live RAG · Team PROCASTO, Thapar Institute of
+Engineering and Technology
 
-Streaming, interruptible, multi-source RAG over three sources: live device state, device manuals (hybrid BM25 + dense search), and the conversation itself.
+| | |
+|---|---|
+| **Live demo** | [procasto.vercel.app](https://procasto.vercel.app) (open **Try the live demo**, no account needed) |
+| **Film (92 s)** | [watch](https://procasto.vercel.app/media/procasto-film.mp4) · source in [`video/`](video) |
+| **Presentation** | [`docs/PROCASTO_Presentation.pptx`](docs/PROCASTO_Presentation.pptx) |
+| **Architecture** | [diagram below](#how-it-works) |
 
-## Run it
+![The PROCASTO home: one room at a time, live power, follow switches](docs/screenshots/home.jpg)
 
-Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+.
+> The website is hosted on Vercel; the live engine (WebSockets, simulator, agents) runs on the team's machine and is
+> reached through a tunnel during judging. If the demo shows "Connecting…", the engine is offline: run it locally in
+> two commands ([below](#run-it-locally)).
+
+---
+
+## Try it in 60 seconds
+
+1. Open [procasto.vercel.app/demo](https://procasto.vercel.app/demo). You get your own simulated home: a washer, a dryer
+   and an AC, live.
+2. Press **1**: the washer breaks with **E3** (keys **1** to **5** each break something). A followed device raises an alert with
+   an **Ask** button.
+3. Open **Assistant** and ask, by voice (Chrome or Edge, hold **Space**) or typing: *"What does 4C mean on the washer?"*
+   The answer comes from **real Samsung fault-code data** with the fix steps and its source.
+4. Under **Diagnose & fix**, pick the washer: **three agents** look at it side by side, one fix is proposed, and nothing
+   changes until you press **Restart the washer**.
+5. Switch on **Under the hood**: the words it heard, the clauses it understood, every retrieval on a
+   timeline, the **head start** (how long before you finished speaking the first lookup began), and the three agents'
+   cache and memory. **Replay demo** (or **R**) runs a scripted story: interrupt ("wait, I meant the dryer") and
+   resume ("OK go back to the washer": *1 reused · 1 refetched*).
+
+| Diagnose & fix: three agents, then a yes | The answer, cited to Samsung fault codes |
+|---|---|
+| ![Diagnose and fix](docs/screenshots/diagnose-and-fix.jpg) | ![Answer with sources](docs/screenshots/answer.jpg) |
+
+## The problem
+
+A smart-home voice assistant has three hard constraints that no existing system meets together:
+
+1. **Latency.** Voice has a ~200 ms perceptual budget. A typical embed → search → generate pipeline starts only after
+   the question ends and takes 300–800 ms.
+2. **Heterogeneous grounding.** *"How long until my washer finishes?"* needs live sensor state, the device's manual and
+   the person's habits at once, without blending stale manual text into live readings.
+3. **Interruption without restart.** *"Actually, what about the dryer?"* is a pivot, not a new conversation. Work
+   already done should be kept.
+
+Smart-home apps show *what*, never *why*. PROCASTO explains the fault, from the right manual, with its source.
+
+## How it works
+
+![Architecture: streaming answer path and the LangGraph agent](docs/architecture.png)
+
+**Streaming answer path** (the voice experience):
+
+- **Retrieval starts mid-sentence.** Partial transcripts stream over a WebSocket. A clause (device + intent + code)
+  counts once it survives two partials, and its lookups start immediately. The *head start* is measured, not
+  assumed: around **2 s** before the end of the sentence on the scripted demo.
+- **Three agents, fanned out in parallel** (asyncio): latency is the slowest agent, not the sum.
+  - **Home State agent**: the live snapshot, kept fresh by **pushed** events (SmartThings webhooks, or the
+    simulator). Never polled; a read takes < 1 ms.
+  - **Manual agent**: hybrid **BM25 + dense** (fastembed `bge-small-en-v1.5`) fused with **RRF (k = 60)**, an exact
+    error-code boost (dense search alone misses codes like "E3"), filtered by model then family. Behind a **semantic
+    cache**: an exact repeat is a dict lookup, a close question (cosine ≥ 0.60) reuses the answer, and the error code
+    is part of the key so E3 and E4 never share one.
+  - **Preference agent**: a per-home **key-value store** of habits ("usually 30 °C", "likes 24 °C"), < 1 ms, taught
+    by the actions you confirm, fading after a month. It grounds suggestions: *Set to 24 °C · your usual*.
+- **Slow Thinker (session-intent prefetch).** While an answer is spoken, it reads the session's intent (laundry,
+  climate) and warms the cache for the whole domain, so a pivot from washer to dryer lands warm.
+- **Park and resume.** A correction to another device parks the plan with its evidence. Resume reuses what is still
+  fresh and refetches what changed.
+- **Precedence is code, not the LLM.** Live readings beat the conversation, which beats manual defaults. Gemini only
+  phrases one sentence from resolved facts; the manual's own words show first and stay if the model is slow.
+
+**LangGraph agent** (Diagnose & fix): `START → [home_state | manual | preferences]` in parallel `→ propose` (Gemini
+via LangChain structured output, rules fallback) `→ confirm` (LangGraph `interrupt`, state kept by the checkpointer)
+`→ act`. Every action goes through one gate: allowlisted per device, real devices only when `ALLOW_COMMANDS=true`, at
+most once per run, and never without a yes.
+
+## Features
+
+- **Website**: landing page with the film, a no-account demo, sign up / sign in / password reset (Supabase), a home
+  in *room focus* with live power, follow switches and alerts, a voice-first assistant, Diagnose & fix, Devices
+  (connect SmartThings), Profile. Glass UI, works on phones.
+- **SmartThings**: one login connects every device the account shares, with rooms and a count; unknown device types
+  work as on/off. Tokens are encrypted before storage; every user's home is separate.
+- **Real data**: **157 real Samsung washer fault codes** (55 faults) from an MIT-licensed table, pinned and
+  hash-checked, answering 4C, 5C, 9C1, UE, tE1 and more for any washer.
+- **Security**: row-level security in Postgres, JWT verification against the project's keys, per-visitor limits,
+  capped socket frames, CSP and security headers, no public API explorer, non-root Docker image.
+
+## Tools and tech stack
+
+| Area | Tools |
+|---|---|
+| AI and retrieval | **LangGraph**, **LangChain** (`langchain-core`, `langchain-google-genai`), **Gemini 3.5 Flash-Lite**, fastembed `BAAI/bge-small-en-v1.5`, `rank-bm25`, reciprocal rank fusion, semantic cache |
+| Backend | Python 3.12, **FastAPI**, asyncio, WebSockets, Pydantic, uvicorn, `uv` |
+| Frontend | **React 19**, Vite, TypeScript, Tailwind CSS 4, Motion, Zustand, React Router, Web Speech API |
+| Accounts and data | **Supabase** (Auth, Postgres with row-level security), Fernet encryption |
+| Devices | **Samsung SmartThings API** (OAuth, webhooks with signature checks), a device simulator |
+| Quality | pytest, vitest, Testing Library, **Playwright** (real-browser checks), ruff, ESLint, knip, vulture |
+| Deploy and media | **Vercel** (website), Docker / Render (engine), ngrok (tunnel), **Remotion** (the film) |
+
+## Run it locally
+
+**You need:** Python 3.12 with [uv](https://docs.astral.sh/uv/), Node.js 20+, and `make` (or run the commands inside
+the `Makefile` by hand). No keys are needed for the demo home.
 
 ```bash
 make setup
@@ -18,102 +120,99 @@ make setup
 make dev
 ```
 
-Open http://localhost:5180 and press **Replay demo** (or `R`). No API keys needed: the home is simulated and answers are written from templates plus the manuals. The first start downloads a 67 MB embedding model (set `DENSE_SEARCH=false` in `.env` to skip it; search then uses BM25 only).
-
-Windows without `make` (PowerShell or Git Bash, from the repo root):
+Open http://localhost:5180 and choose **Try the live demo**. Without `make`:
 
 ```bash
 cd backend && uv sync --extra dense && cd ../frontend && npm install
 ```
 
 ```bash
-backend/.venv/Scripts/python -m uvicorn app.main:create_app --factory --app-dir backend --port 8000
+backend/.venv/bin/python -m uvicorn app.main:create_app --factory --app-dir backend --port 8000
 ```
 
 ```bash
 npm --prefix frontend run dev
 ```
 
-Single process (what you'd deploy): `npm --prefix frontend run build`, then run only the uvicorn command above and open http://localhost:8000.
+(On Windows the Python path is `backend/.venv/Scripts/python`.)
 
-## The 20-second demo
+**Optional keys** (copy `.env.example` to `.env`; everything has a working default):
 
-Press **Replay demo**. It drives the exact same code path as a live microphone (partial transcripts over the WebSocket), with captions:
-
-1. The home is live. The washer is running with 14 minutes left. "Under the hood" opens.
-2. "How long until the washer finishes and what temperature is it washing at": the clause *washer · status* turns stable after two partial transcripts and the live-state lookup fires. The **head start** badge ends up around 2 s: that's how long before the end of the sentence the first grounded retrieval started.
-3. Mid-sentence the washer throws **E3**. The status card flips to *Stopped · Error E3* on its own, the engine auto-adds an E3 lookup, and cards for the problem and the fix appear, citing **WW90T manual §E3 p.41**.
-4. The voice starts explaining. "Wait I meant the dryer" cuts it off instantly; the washer plan is **parked** (blue), the dryer answer appears.
-5. "OK go back to the washer": the parked answer returns. The badge shows **1 reused · 1 refetched**: the manual answer was still valid, the washer's live reading had changed while parked.
-
-Try it by hand too: talk (hold **Space**, Chrome or Edge) or type (every word streams on the space bar), tap a suggestion chip, or break something from the bar at the bottom (`1`–`5`). Ask "why is the AC using so much power" after an AC spike and confirm the suggested fix; the simulated AC actually changes.
-
-## How it works
-
-```mermaid
-flowchart LR
-  MIC[Mic / typing / replay<br/>partial transcripts] --> WS[WebSocket]
-  WS --> CX[Clause extractor<br/>rules + stability N=2]
-  CX --> QP[Query plan<br/>revisions · park · resume]
-  QP --> OR[Orchestrator<br/>asyncio tasks · cancel · stale drop]
-  OR --> R1[Live state] & R2[Manuals<br/>BM25 + bge-small, RRF] & R3[Session]
-  R1 & R2 & R3 --> EV[Typed evidence<br/>precedence rules]
-  EV --> CO[Card composer<br/>templates + optional LLM sentence]
-  CO --> UI[Cards · speech · timeline]
-  SIM[Simulator / SmartThings] --> ST[Revisioned live store] --> INV[Invalidation] --> QP
-```
-
-- **Stability rule.** Browser speech recognition rewrites earlier words, so a clause only counts once it appears in two consecutive partials. Clauses with no device ("how long is left") wait for the end of the sentence, so "go back to…" can't resume the wrong plan.
-- **Revisions everywhere.** Every plan change bumps a revision; every device event bumps that device's revision. A result that arrives after its plan moved on is dropped, and the drop is shown.
-- **Park and resume.** A correction to another device parks the whole plan with its evidence (up to 3). Resume re-uses evidence whose device revision is still current and re-fetches the rest.
-- **Precedence is code, not the LLM.** Live readings beat the conversation, which beats manual defaults. Manuals must match the device's model (or family). The LLM, if enabled, only writes one or two sentences from already-resolved facts, with a 1.5 s timeout that falls back to the manual's own words.
-- **Material changes only.** Power noise and a tenth of a degree don't churn answers; a state change, an error code, a new target or a >25 % power jump does.
-
-## Status, honestly
-
-| Area | Status |
+| Variable | What it turns on |
 |---|---|
-| Streaming clauses, plans, orchestrator, stale drops, invalidation, park/resume, precedence, cards, metrics, replay (F1–F17, F20–F22) | ✅ built and tested (backend 197 tests, 95 % coverage; frontend 26 tests) and run end to end in the browser |
-| Voice in (Web Speech interim results) and out (speechSynthesis, instant stop) (F5, F19) | ✅ built; automated tests cover the stop path and echo guard. Live mic needs Chrome/Edge and internet (Google's speech service) and was not tested with a real microphone here. Use headphones on stage: speakers can leak the voice back into the mic (an echo guard filters most of it) |
-| Confirmed device commands (F24) | ✅ on the simulator. Real devices need `ALLOW_COMMANDS=true` |
-| SmartThings (F23) | ⚠️ built against the official SDK's signature scheme and payloads, tested with signed fixtures and mocked APIs; **not run against a real SmartThings account**. Needs an API Access app, a public tunnel URL, and a check of the OAuth endpoints in the Developer Workspace |
-| Gemini phrasing (F18, M11) | ⚠️ implemented and tested against a mocked API; not run with a real key. Off by default |
-| Alexa (F25) | ⚠️ endpoint tested with fixture requests; not run in the Alexa simulator. No Alexa certificate-chain verification yet (required before publishing a skill). Alexa only sends final utterances: no streaming or barge-in on that path |
-| Local Jamba model, deploy, recorded video (M11 option, M13) | ❌ not done |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | accounts (sign up, profile, saved follow choices) |
+| `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini phrasing and the agent's proposals |
+| `SMARTTHINGS_CLIENT_ID`, `SMARTTHINGS_CLIENT_SECRET`, `PUBLIC_BASE_URL`, `TOKEN_ENCRYPTION_KEY` | real Samsung devices |
+| `DENSE_SEARCH=false` | BM25 only, no model download |
+| `CORS_ORIGINS`, `TRUSTED_PROXY_HOPS` | hosting the website separately (e.g. Vercel) |
 
-## Configuration
+**One process, like production:** `npm --prefix frontend run build`, then run only the uvicorn command and open
+http://localhost:8000. Or `docker build -t procasto . && docker run -p 8000:8000 --env-file .env procasto`.
 
-Copy `.env.example` to `.env`. Everything has a working default.
+**Hosting the website on Vercel:** build with `VITE_BACKEND_URL=<engine URL> npx vite build --outDir dist-vercel` in
+`frontend/`, copy [`frontend/deploy/vercel.json`](frontend/deploy/vercel.json) into it, and deploy that folder. The
+engine needs a host with WebSockets (Render via [`render.yaml`](render.yaml), or any Docker host).
 
-| Variable | Default | What it does |
-|---|---|---|
-| `DEVICE_PROVIDER` | `sim` | `smartthings` for real devices |
-| `LLM_PROVIDER` | `fake` | `gemini` to phrase the "what to do" sentence with Gemini (`GEMINI_API_KEY`, `GEMINI_MODEL`) |
-| `DENSE_SEARCH` | `true` | `false` = BM25 only, no model download |
-| `ALLOW_COMMANDS` | `false` | allow confirmed commands on real devices |
-| `CLAUSE_STABILITY_N` | `2` | partials a clause must survive |
-| `TASK_TIMEOUT_MS` / `LLM_TIMEOUT_MS` | `3000` / `1500` | retrieval and phrasing timeouts |
-| `SMARTTHINGS_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI`, `PUBLIC_BASE_URL` | empty | SmartThings OAuth and webhook |
-| `ALEXA_SKILL_ID` | empty | only answer requests for this skill |
-
-## Tests and checks
+## Tests
 
 ```bash
 make test
 ```
 
 ```bash
-make lint
+make e2e
 ```
 
-```bash
-make deadcode
+- **Backend: 310 tests, 95 % coverage** (unit + integration, including the full socket flow and the agents).
+- **Frontend: 55 tests** (vitest + Testing Library); `tsc`, ESLint and knip clean.
+- **End to end: 27 real-browser checks** at desktop and phone size on the production build (landing, film streaming,
+  demo, alerts, cited answers, the three agents, sign-in guard, security headers, no sideways scroll).
+
+## Data and honesty
+
+| Data | Status |
+|---|---|
+| Samsung washer fault codes (157 codes) | **Real**, from [ha-samsung-washer-local](https://github.com/perseus177/ha-samsung-washer-local) (MIT), pinned and hash-checked; wording is that project's own, not Samsung's |
+| Samsung washer, dryer, fridge, dishwasher codes (84 rows) | **Real**, from [ApplianceDB](https://github.com/ApplianceDB/ApplianceDB-public) (ODbL 1.0), delivered as a spreadsheet in [`data/real/`](data/real) for embedding |
+| WW90T washer, DV90T dryer, AR12 AC manuals | **Sample** manuals we wrote, labelled "sample manual" in every citation |
+| Demo home devices | **Simulated**; real devices appear after a SmartThings login |
+| Air conditioner fault codes | No openly licensed source exists; Samsung's pages forbid copying, so not used |
+
+**Not yet verified:** a real Samsung account end to end (needs SmartThings developer credentials; the flow is tested
+against the official SDK's signature scheme and mocked APIs), the Alexa skill in the Alexa simulator, and a live
+microphone on stage (Web Speech needs Chrome or Edge and internet).
+
+**We claim:** retrieval starts from stable clauses before the sentence ends, and the head start is measured; three
+agents run in parallel; corrections park only what they affect and resume reuses fresh evidence; every answer cites
+its source; nothing changes on a device without a yes. **We don't claim:** sub-200 ms full answers with an LLM, or
+zero hallucination (templates carry every fact so the model can't invent one).
+
+## Repository map
+
+```
+backend/            FastAPI engine
+  app/agent/          LangGraph agent, preference store, session-intent prefetch
+  app/retrieval/      manual search (BM25 + dense + RRF), semantic cache, live state
+  app/nlu/ planning/  clause extraction, query plans, park and resume, orchestrator
+  app/devices/        simulator, SmartThings (OAuth, webhooks), command gate
+  data/manuals/       manuals and the real Samsung fault table
+  scripts/            data ingestion and export (pinned, hash-checked)
+  tests/              310 tests
+frontend/           React website (src/pages, src/components, src/lib)
+data/real/          real fault data as a spreadsheet and CSV, with sources and licences
+docs/               presentation, architecture diagram, screenshots, dev notes
+e2e/                real-browser smoke test (Playwright)
+supabase/           database migrations (row-level security)
+video/              the film's source (Remotion)
 ```
 
-`make types` regenerates `frontend/src/types/generated.ts` from the Pydantic models; a test fails if they drift. `WORKING_STATE.md` records every verified state and `LESSONS.md` every bug and its fix.
+Build history and every verified state: [`docs/dev-notes/WORKING_STATE.md`](docs/dev-notes/WORKING_STATE.md); every
+bug and its fix: [`docs/dev-notes/LESSONS.md`](docs/dev-notes/LESSONS.md).
 
-## What we claim, and what we don't
+## Team
 
-We claim: retrieval starts from stable clauses before the utterance ends, and the head start is measured, not assumed; device events and speech feed one revisioned plan; corrections cancel or park only what they affect and resume re-uses fresh evidence; every card cites its source and freshness; the simulator and SmartThings share one provider contract.
+- **Anmol Poddar** · apoddar_be25@thapar.edu
+- **Jeevansh Bhatia** · jeevanshbhatia650@gmail.com
 
-We don't claim: sub-200 ms full answers, exact LLM resumption, zero hallucination (templates carry every fact precisely so the LLM can't invent one), or streaming through Alexa.
+Thapar Institute of Engineering and Technology. Licensed under [MIT](LICENSE); third-party data keeps its own licence.
+PROCASTO is an independent project, not affiliated with Samsung. SmartThings is a trademark of Samsung Electronics.

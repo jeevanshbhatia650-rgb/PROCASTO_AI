@@ -5,7 +5,7 @@ import { askLink, questionFor } from "../pages/app/home/questions";
 import type { DeviceSnapshot } from "../types/generated";
 import { friendlyError, validateEmail, validatePassword } from "./account";
 import { smartthingsResult } from "./connections";
-import { alertKey, alertText, deviceView, needsAttention, spokenName } from "./deviceView";
+import { alertText, deviceView, needsAttention, spokenName } from "./deviceView";
 import { initialData, MAX_POWER_SAMPLES, reduce, withPowerSample, type Data } from "./store";
 
 const device = (kind: "washer" | "dryer" | "ac", attributes: Record<string, unknown>): DeviceSnapshot => ({
@@ -73,8 +73,12 @@ describe("device words", () => {
 
   it("alerts on a new state or fault, never on a new reading", () => {
     const running = device("washer", { state: "RUNNING", power_w: 450, remaining_min: 14 });
-    expect(alertKey(running)).toBe(alertKey(device("washer", { state: "RUNNING", power_w: 470, remaining_min: 9 })));
-    expect(alertKey(running)).not.toBe(alertKey(device("washer", { state: "DONE" })));
+    expect(alertText(running)).toBe(alertText(device("washer", { state: "RUNNING", power_w: 470, remaining_min: 9 })));
+    expect(alertText(running)).not.toBe(alertText(device("washer", { state: "DONE" })));
+    // A fault arrives as two updates, the code then the stopped state: one sentence, so one alert.
+    expect(alertText(device("washer", { state: "RUNNING", error_code: "E3" }))).toBe(
+      alertText(device("washer", { state: "ERROR", error_code: "E3" })),
+    );
     expect(alertText(device("washer", { state: "RUNNING", error_code: "E3" }))).toBe("Washer stopped · error E3");
     expect(alertText(device("washer", { state: "DONE" }))).toBe("Washer finished");
     expect(alertText(device("ac", { state: "COOLING", power_w: 3200 }))).toBe("AC is drawing unusually high power");

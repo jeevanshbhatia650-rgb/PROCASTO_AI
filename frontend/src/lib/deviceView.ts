@@ -46,12 +46,10 @@ export function needsAttention(snapshot: DeviceSnapshot): boolean {
   return tone === "bad" || tone === "warn";
 }
 
-/** The part of a device worth a notification when it changes: its state, a fault, a spike. Never a new reading. */
-export function alertKey(snapshot: DeviceSnapshot): string {
-  const a = snapshot.attributes;
-  return `${String(a.state ?? "")}|${String(a.error_code ?? "")}|${needsAttention(snapshot)}`;
-}
-
+/**
+ * What a follower is told about a device. An alert goes out only when this sentence changes, so a new reading, or a
+ * fault that arrives as two updates (the code, then the stopped state), never alerts twice.
+ */
 export function alertText(snapshot: DeviceSnapshot): string {
   const a = snapshot.attributes;
   const name = snapshot.info.display_name;

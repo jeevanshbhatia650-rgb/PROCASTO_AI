@@ -85,3 +85,18 @@ Every entry is a state that was verified to work. Before changing a module liste
 - Frontend review fixes: the socket retries once with a fresh token before signing you out, waits 10 s after "busy", resets backoff only on hello; a page that fails to download shows Reload; a crashed page clears when you navigate; Space no longer steals focused buttons; the account menu is a disclosure and Escape returns focus; aria-labels stay constant with aria-pressed; profile and connection checks show an error with retry and never offer Connect on a guess; changing your password signs out your other devices.
 - Tests: backend 267 (ruff + format clean), frontend 54 vitest, tsc/eslint/knip clean, e2e/smoke.py 21 checks at 1440 and 390 px on the production build (now also: follow alert, hood transcript, no sideways scroll). Live link verified serving this build.
 - Do NOT change without re-running: `tests/unit/test_auth_verifier.py`, `tests/unit/test_homes_and_web.py`, `tests/integration/test_accounts.py`, `src/lib/website.test.ts`, `e2e/smoke.py`.
+
+## [Data] Real Samsung washer fault codes - WORKING ✅ (2026-09-30)
+- Commit: `08afb15`
+- Source: github.com/perseus177/ha-samsung-washer-local (MIT), pinned to `b75ef1e`, file hash checked. Its wording is its own, not Samsung's. `backend/scripts/ingest_samsung_faults.py` reads the table as data (ast, never executed) and writes `data/manuals/SAMSUNG_WASHER_FAULTS.md`: 55 faults, 157 codes. MIT notice in `data/licenses/`.
+- The table is family-wide: every washer (demo WW90T and any SmartThings washer) answers 4C, 5C, 9C1, UE, tE1 with the fix and the citation "Samsung washer fault codes §4E". Our three hand-written manuals are now cited as "sample manual".
+- Codes of any Samsung shape are recognised only when a manual lists them; letters-only codes only in capitals or after "error"/"code".
+- No vector database: 384-dim bge-small vectors in memory plus BM25 is plenty at this size (ChatGPT's research agreed; revisit only with a measured benchmark).
+- Tests: backend 292; the family scope was mutation-checked (15 tests fail without it). One unreproduced flaky failure seen in 1 of 9 full runs.
+- Re-run the ingest: `cd backend && uv run python -m scripts.ingest_samsung_faults` (refuses if the upstream file or licence changed).
+
+## [Film] 90-second promo video - WORKING ✅ (2026-09-30)
+- Remotion project in `video/` (13 scenes, 1920x1080, 30 fps, 91 s). Real app captures in `video/public/shot-*.png` (made with the scratchpad `video_shots.py` against the dev server); the SmartThings connect and follow sequences are animated and labelled "Illustration with sample devices"; end card says not affiliated with Samsung.
+- Render: `cd video && npx remotion render Promo out/procasto-promo.mp4`. Web copy (720p, faststart, ~2.5 MB) and poster in `frontend/public/media/`.
+- On the site: "See it in 90 seconds" section right after the hero plus a link under the hero buttons; plays muted only while on screen, never autoplays with reduced motion. Served with range requests (206).
+- Gotcha: OneDrive marks folders with a reparse point that Node sees as a symlink, so Remotion can't copy a folder inside `public/`. Keep public assets flat.

@@ -7,7 +7,7 @@ import { Backdrop } from "../../components/glass/Backdrop";
 import { signOut, useProfile } from "../../lib/account";
 import { SCENARIOS, triggerScenario } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { alertKey, alertText } from "../../lib/deviceView";
+import { alertText } from "../../lib/deviceView";
 import { POWER_SAMPLE_MS, useStore } from "../../lib/store";
 import { freshToken } from "../../lib/supabase";
 import { useWatchlist } from "../../lib/watchlist";
@@ -81,11 +81,12 @@ function WatchAlerts() {
     for (const device of Object.values(devices)) {
       const id = device.info.device_id;
       const before = states.get(id);
-      const now = alertKey(device);
+      const now = alertText(device);
       states.set(id, now);
       if (before === undefined || before === now || !watched.has(id)) continue;
       const question = questionFor(device);
-      toast(alertText(device), { action: { label: "Ask", onClick: () => navigate(askLink(base, question)) } });
+      // One slot per device: a newer alert replaces the older one instead of stacking.
+      toast(now, { id: `watch-${id}`, action: { label: "Ask", onClick: () => navigate(askLink(base, question)) } });
     }
   }, [session, devices, watched, base, navigate]);
   return null;

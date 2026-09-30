@@ -32,6 +32,11 @@ async def landing(page: Page, base: str) -> None:
     assert response is not None
     await expect(page.get_by_role("heading", name="Your home, explained.")).to_be_visible()
     step("landing page shows the headline")
+    await page.get_by_role("link", name="Or watch the 90-second film.").click()
+    await expect(page.get_by_role("heading", name="See it in 90 seconds.")).to_be_in_viewport()
+    film = await page.request.get(base + "/media/procasto-film.mp4", headers={"Range": "bytes=0-99"})
+    assert film.status == 206 and film.headers["content-type"] == "video/mp4", (film.status, film.headers)
+    step("the film is one click away and streams (seekable)")
     if base.endswith(":8000"):  # the production server adds security headers; the dev server doesn't
         headers = response.headers
         assert "script-src 'self'" in headers.get("content-security-policy", ""), headers
@@ -62,7 +67,7 @@ async def demo_fault_to_answer(page: Page, base: str) -> None:
     attention = page.get_by_role("region", name="Home insight")
     await expect(attention.get_by_text("1 device needs attention")).to_be_visible(timeout=10000)
     step("breaking the washer brings a fault into Worth knowing")
-    await expect(page.get_by_text("Washer stopped · error E3")).to_be_visible()
+    await expect(page.get_by_text("Washer stopped · error E3")).to_have_count(1)  # one fault, one alert
     step("a followed device that breaks raises an alert")
 
     await page.get_by_role("region", name="Laundry room").get_by_role("link").first.click()

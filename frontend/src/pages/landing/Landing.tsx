@@ -2,6 +2,7 @@ import { ArrowRight, CirclePlay } from "lucide-react";
 import { Link } from "react-router";
 import { Backdrop } from "../../components/glass/Backdrop";
 import { Logo } from "../../components/glass/Logo";
+import { Film } from "./Film";
 import { HeroPreview } from "./HeroPreview";
 import { CallToAction, Different, Footer, HowItWorks, Privacy } from "./LandingSections";
 
@@ -66,7 +67,10 @@ function Hero() {
           </Link>
         </div>
         <p className="rise t-fine mt-4 text-ink-48" style={{ animationDelay: "220ms" }}>
-          The demo needs no account. It runs on a simulated home you can break.
+          The demo needs no account. It runs on a simulated home you can break.{" "}
+          <a href="#film" className="underline underline-offset-2 hover:text-ink">
+            Or watch the 90-second film.
+          </a>
         </p>
       </div>
       <div className="rise mt-14 sm:mt-16" style={{ animationDelay: "260ms" }}>
@@ -83,6 +87,7 @@ export default function Landing() {
       <Nav />
       <main>
         <Hero />
+        <Film />
         {/* One frosted panel for everything below the hero, as in the reference: text never sits on the room. */}
         <div className="px-3 sm:px-6">
           <div className="glass-panel mx-auto max-w-[1240px] rounded-xl">

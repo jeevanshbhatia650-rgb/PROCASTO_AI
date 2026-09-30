@@ -76,6 +76,10 @@ _SPOKEN_CODE = re.compile(r"\b(?:error|code)\s+(?:code\s+)?([a-z]{1,2})\s(\d{1,2
 _TEMP = re.compile(r"\b(?:to|at)\s+(\d{2})\b|\b(\d{2})\s*(?:°|degrees)")
 _SEGMENT_BREAK = re.compile(r"\s+(?:and|also|then|plus|but)\s+|[,;.?!]")
 _NOT_CODES = {"AC", "TV", "AM", "PM", "OK"}
+# Codes the manuals know take other shapes too (4C, 9C1, UE, tE1). Those are only trusted when a manual lists them.
+_WORD = re.compile(r"\b[A-Za-z0-9]{2,4}\b")
+_CUED = re.compile(r"\b(?:error|code)\s+(?:code\s+)?([a-z0-9]{1,3}(?:\s[a-z0-9]{1,3}){0,2})\b", re.IGNORECASE)
+_PIECE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 _STOP_ALONE = {"stop", "stop it", "stop talking", "ok stop", "please stop"}
 _FOLLOWUP_PREFIXES = ("and ", "also ", "plus ", "what about ", "how about ")
 
@@ -88,7 +92,10 @@ def _phrase_regex(phrases: Iterable[str]) -> re.Pattern[str]:
 
 
 class Lexicon:
-    def __init__(self, devices: list[DeviceInfo], model_ids: Iterable[str] = ()) -> None:
+    def __init__(
+        self, devices: list[DeviceInfo], model_ids: Iterable[str] = (), known_codes: Iterable[str] = ()
+    ) -> None:
+        self._known_codes = {c.upper() for c in known_codes}
         self._alias_to_device: dict[str, str] = {}
         for device in devices:
             for alias in [*device.aliases, device.display_name]:
@@ -112,6 +119,18 @@ class Lexicon:
                 if m.group(1).upper() in _NOT_CODES or code in self._model_ids:
                     continue
                 found.setdefault(m.start(), (m.start(), m.end(), code))
+        for m in _WORD.finditer(text):  # a known code written out: "4C", "9c1", "UE" (letters alone only in capitals)
+            word, code = m.group(0), m.group(0).upper()
+            if code in self._known_codes and code not in _NOT_CODES and (word.isupper() or not word.isalpha()):
+                found[m.start()] = (m.start(), m.end(), code)
+        for m in _CUED.finditer(text):  # after "error"/"code" a known code may be spoken apart: "error u e", "code 4 c"
+            pieces = list(_PIECE.finditer(m.group(1)))
+            for n in range(len(pieces), 0, -1):
+                code = "".join(p.group(0) for p in pieces[:n]).upper()
+                if code in self._known_codes:
+                    start = m.start(1)
+                    found[start] = (start, start + pieces[n - 1].end(), code)
+                    break
         return sorted(found.values())
 
     def pronoun_in(self, lower: str) -> str | None:

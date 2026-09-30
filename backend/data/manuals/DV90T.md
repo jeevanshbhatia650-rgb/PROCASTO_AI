@@ -1,5 +1,6 @@
 ---
 model_id: DV90T
+citation: DV90T sample manual
 family: dryer
 title: DV90T heat pump dryer, user manual
 ---

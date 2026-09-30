@@ -19,7 +19,7 @@ EXACT_CODE_BOOST = 1.0  # an exact error-code heading always outranks fuzzy matc
 MENTIONED_CODE_BOOST = 0.01
 _TOKEN = re.compile(r"[a-z0-9]+")
 _STOPWORDS = {"the", "a", "an", "of", "to", "is", "and", "or", "it", "on", "in", "for", "what", "does", "my"}
-_LEADING_CODE = re.compile(r"^([A-Z]{1,2}\d{1,2})\b")
+_LEADING_CODE = re.compile(r"^([A-Z0-9]{2,4}) error\b")  # the planner asks "<code> error meaning fix"
 
 
 def tokenize(text: str) -> list[str]:
@@ -50,6 +50,7 @@ class Hit:
             "text": s.text,
             "page": s.page,
             "codes": list(s.codes),
+            "heading_codes": list(s.heading_codes),
             "citation": s.citation,
             "summary": s.summary(),
             "steps": s.steps(),
@@ -68,6 +69,12 @@ class ManualIndex:
         for i, s in enumerate(sections):
             groups[f"model:{s.model_id}"].append(i)
             groups[f"family:{s.family}"].append(i)
+        models = {s.model_id: s.family for s in sections if not s.family_wide}
+        for i, s in enumerate(sections):  # a family-wide table answers for every model of that family
+            if s.family_wide:
+                for model_id, family in models.items():
+                    if family == s.family:
+                        groups[f"model:{model_id}"].append(i)
         bm25 = {key: BM25Okapi([tokenize(self._doc(sections[i])) for i in idx]) for key, idx in groups.items()}
         # Dense side embeds what a section is about (heading + opening sentences); BM25 covers the full text.
         vectors = (
@@ -88,6 +95,10 @@ class ManualIndex:
     def model_ids(self) -> list[str]:
         return sorted({s.model_id for s in self._sections})
 
+    def error_codes(self) -> list[str]:
+        """Every code a manual has a section for, so speech and typing can recognise it."""
+        return sorted({code for s in self._sections for code in s.heading_codes})
+
     def search(
         self, query: str, model_id: str, family: str | None = None, error_code: str | None = None, k: int = 2
     ) -> list[Hit]:
@@ -103,7 +114,7 @@ class ManualIndex:
         scores = rrf(*rankings)
         for i in idx:
             section = self._sections[i]
-            if error_code and section.heading_code == error_code:
+            if error_code and error_code in section.heading_codes:
                 scores[i] += EXACT_CODE_BOOST
             elif error_code and error_code in section.codes:
                 scores[i] += MENTIONED_CODE_BOOST

@@ -178,3 +178,16 @@ def test_reset_starts_a_new_utterance(extractor):
     extractor.reset()
     result = extractor.update("is the dryer done", t_ms=0)
     assert not result.clauses[0].stable
+
+
+def test_real_samsung_code_shapes_are_recognised_only_when_a_manual_knows_them(devices):
+    lex = Lexicon(devices, model_ids=["WW90T"], known_codes=["4C", "9C1", "UE", "HE", "E3"])
+    found = lambda text: [code for _, _, code in lex.codes_in(text)]  # noqa: E731
+    assert found("what does 4C mean on the washer") == ["4C"]
+    assert found("the washer shows 9c1") == ["9C1"]
+    assert found("it says UE") == ["UE"]
+    assert found("error u e on the washer") == ["UE"]
+    assert found("code 4 c") == ["4C"]
+    assert found("he said it was the 1st wash") == []  # ordinary words are not codes
+    assert found("is the AC on") == []
+    assert found("E3 on the WW90T") == ["E3"]

@@ -69,7 +69,7 @@ async def test_demo_ends_back_on_the_washer_with_the_dryer_parked(env):
     assert {c.device_id for c in plan.clauses} == {"washer-01"}
     assert [p.device_ids for p in session.engine.parked()] == [["dryer-01"]]
     cards = {c.type: c for c in session.composer.cards_for(plan.plan_id)}
-    assert cards[CardType.PROBLEM].sources[0].label == "WW90T manual §E3 p.41"
+    assert cards[CardType.PROBLEM].sources[0].label == "WW90T sample manual §E3 p.41"
 
 
 async def test_demo_speaks_then_gets_interrupted(env):

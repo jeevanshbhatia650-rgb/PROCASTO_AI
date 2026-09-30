@@ -42,7 +42,7 @@ export function HeroPreview() {
               <Radio size={13} aria-hidden="true" /> Live · just now
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-chip px-3 py-1 t-fine text-ink-80">
-              <BookOpenCheck size={13} aria-hidden="true" /> WW90T manual §E3 p.41
+              <BookOpenCheck size={13} aria-hidden="true" /> WW90T sample manual §E3 p.41
             </span>
           </div>
         </article>

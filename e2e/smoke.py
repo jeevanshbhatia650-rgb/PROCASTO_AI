@@ -72,7 +72,7 @@ async def demo_fault_to_answer(page: Page, base: str) -> None:
         await page.screenshot(path=os.path.join(shots, f"assistant-{page.viewport_size['width']}.png"), full_page=True)
     problem = page.get_by_text("E3 · Water not draining")
     await expect(problem.first).to_be_visible(timeout=20000)
-    await expect(page.get_by_text("WW90T manual §E3 p.41").first).to_be_visible()
+    await expect(page.get_by_text("WW90T sample manual §E3 p.41").first).to_be_visible()
     step("Ask why answers with the manual page it came from")
 
     await page.get_by_role("switch", name="Under the hood").click()

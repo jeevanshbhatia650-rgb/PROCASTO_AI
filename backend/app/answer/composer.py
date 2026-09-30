@@ -155,7 +155,8 @@ class Composer:
         if not code or manual is None:
             return
         facts = resolve([live, manual], info)
-        hit = next((h for h in facts.manual_hits if h["section_id"] == code), None)
+        # A code can be one spelling of a section: 4C is listed under 4E in the Samsung table.
+        hit = next((h for h in facts.manual_hits if code in h.get("heading_codes", (h["section_id"],))), None)
         self._add(
             cards,
             plan,
@@ -167,9 +168,11 @@ class Composer:
         )
         if hit is None:
             return
-        fix = next((h for h in facts.manual_hits if h is not hit), None)
+        # Extra help only from the same document, so one answer never mixes two manuals.
+        fix = next((h for h in facts.manual_hits if h is not hit and h["model_id"] == hit["model_id"]), None)
         card_id = self._card_id(plan, info, CardType.ACTION)
-        phrase = self._phrase(card_id, Intent.ERROR_LOOKUP, facts.plain(), hit["text"], [live, manual])
+        asked = {**facts.plain(), "code_asked_about": code, "code_on_display": attrs.get("error_code") or "none"}
+        phrase = self._phrase(card_id, Intent.ERROR_LOOKUP, asked, hit["text"], [live, manual])
         restart = info.kind == DeviceKind.WASHER and attrs.get("state") == "ERROR"
         command = CommandSpec("restart", {}, "Fixed it · restart") if restart else None
         self._add(

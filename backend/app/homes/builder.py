@@ -48,7 +48,7 @@ def build_home(
         simulator=simulator,
         manuals=manuals,
         llm=llm,
-        lexicon=Lexicon(devices, manuals.model_ids()),
+        lexicon=Lexicon(devices, manuals.model_ids(), manuals.error_codes()),
         commands=CommandGate(provider, infos, real_devices=simulator is None, allow_real=settings.allow_commands),
         notice=notice,
     )

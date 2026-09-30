@@ -124,7 +124,7 @@ async def test_washer_e3_produces_status_problem_and_what_to_do(world):
     status, problem, todo = cards
     assert status.title == "Washer stopped · Error E3"
     assert problem.title == "E3 · Water not draining"
-    assert [s.label for s in problem.sources] == ["WW90T manual §E3 p.41"]
+    assert [s.label for s in problem.sources] == ["WW90T sample manual §E3 p.41"]
     assert todo.steps[0] == "Switch the washer off and unplug it."
     assert todo.command.command == "restart"
     assert all(c.evidence_ids for c in cards)
@@ -184,7 +184,7 @@ async def test_energy_card_suggests_a_warmer_target(world):
     assert info.title == "AC drawing 3.2 kW"
     assert "78% above the 1.8 kW" in info.body
     assert (info.command.command, info.command.args) == ("set_target_temp", {"value": 24.0})
-    assert "AR12 manual §4.2 p.19" in [s.label for s in info.sources]
+    assert "AR12 sample manual §4.2 p.19" in [s.label for s in info.sources]
 
 
 async def test_confirm_card_then_resolution(world):

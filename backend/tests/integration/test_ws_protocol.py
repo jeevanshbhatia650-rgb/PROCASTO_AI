@@ -41,7 +41,7 @@ def ask(ws, text):
 
 def test_healthz_manuals_and_open_demo_config(client):
     assert client.get("/healthz").json()["ok"] is True
-    assert set(client.get("/api/manuals").json()["models"]) == {"WW90T", "DV90T", "AR12"}
+    assert set(client.get("/api/manuals").json()["models"]) == {"WW90T", "DV90T", "AR12", "SAMSUNG-WASHER"}
     assert client.post("/api/manuals/ingest").status_code in (404, 405)  # not exposed on a public server
     config = client.get("/api/config").json()
     assert config == {"accounts": False, "supabase_url": None, "supabase_publishable_key": None,
@@ -132,3 +132,12 @@ def test_the_api_explorer_is_not_public(client):
         if response.status_code != 404:
             assert "text/html" in response.headers["content-type"]
             assert "swagger" not in response.text.lower() and '"openapi"' not in response.text
+
+
+def test_a_real_samsung_code_is_answered_from_the_fault_table(client):
+    with demo_session(client, "real-code") as (ws, _, _):
+        ws.send_json({"type": "transcript.final", "data": {"text": "what does 4C mean on the washer", "seq": 1}})
+        problem = lambda m: m["data"]["type"] == "problem"  # noqa: E731
+        card = read_until(ws, "card.upsert", where=problem)[-1]["data"]
+        assert card["title"] == "4C · No water coming in - the fill timed out"
+        assert card["sources"][0]["label"] == "Samsung washer fault codes §4E"

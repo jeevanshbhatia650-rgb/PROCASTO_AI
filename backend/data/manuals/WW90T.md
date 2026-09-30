@@ -1,5 +1,6 @@
 ---
 model_id: WW90T
+citation: WW90T sample manual
 family: washer
 title: WW90T front-load washer, user manual
 ---

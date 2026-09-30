@@ -6,7 +6,9 @@ from pathlib import Path
 
 _HEADING = re.compile(r"^##\s+(?P<sid>[A-Z0-9][\w.]*)\s+(?P<title>.+?)(?:\s+\(p\.(?P<page>\d+)\))?\s*$")
 _CODE = re.compile(r"\b[A-Z]{1,2}\d{1,2}\b")
-_HEADING_CODE = re.compile(r"^[A-Z]{1,2}\d{1,2}$")
+# A code heading has a capital letter and no dot: E3, DC1, 4C, 9C1, UE. Section numbers look like 6.1.
+_HEADING_CODE = re.compile(r"^(?=[A-Z0-9]*[A-Z])[A-Z0-9]{2,4}$")
+_ALSO_SHOWN = re.compile(r"^Also shown as:\s*(.+)$", re.MULTILINE)
 _STEP = re.compile(r"^\s*\d+\.\s+(.*)$")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
@@ -20,21 +22,32 @@ class Section:
     text: str
     page: int | None
     codes: tuple[str, ...]
+    source: str = ""  # how citations name the document; defaults to "<model> manual"
+    family_wide: bool = False  # applies to every model of the family, e.g. a brand's fault-code table
 
     @property
-    def heading_code(self) -> str | None:
-        return self.section_id if _HEADING_CODE.match(self.section_id) else None
+    def heading_codes(self) -> tuple[str, ...]:
+        """The codes this section is about: its heading plus the spellings listed under "Also shown as"."""
+        if not _HEADING_CODE.match(self.section_id):
+            return ()
+        also = _ALSO_SHOWN.search(self.text)
+        aliases = [c.strip().upper() for c in also.group(1).split(",")] if also else []
+        return tuple(dict.fromkeys([self.section_id, *aliases]))
 
     @property
     def citation(self) -> str:
         page = f" p.{self.page}" if self.page else ""
-        return f"{self.model_id} manual §{self.section_id}{page}"
+        return f"{self.source or f'{self.model_id} manual'} §{self.section_id}{page}"
 
     def steps(self) -> list[str]:
         return [m.group(1).strip() for line in self.text.splitlines() if (m := _STEP.match(line))]
 
     def summary(self, sentences: int = 2) -> str:
-        prose = " ".join(line for line in self.text.splitlines() if line.strip() and not _STEP.match(line))
+        prose = " ".join(
+            line
+            for line in self.text.splitlines()
+            if line.strip() and not _STEP.match(line) and not _ALSO_SHOWN.match(line)
+        )
         return " ".join(_SENTENCE_END.split(prose.strip())[:sentences])
 
 
@@ -70,6 +83,8 @@ def parse_manual(text: str) -> list[Section]:
                 content,
                 int(page) if page else None,
                 codes,
+                meta.get("citation", ""),
+                meta.get("scope") == "family",
             )
         )
 

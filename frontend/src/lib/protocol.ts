@@ -29,6 +29,32 @@ export type ClausesUpdate = {
   mentions: string[]; // devices named after a correction marker ("wait, I meant the dryer")
 };
 
+/** One of the three retrieval agents, as it reported on a diagnose run. */
+export type AgentReport = { agent: "home_state" | "manual" | "preferences"; ms: number; detail: string; cache?: string };
+
+/** A diagnose-and-act run of the LangGraph agent. `waiting` means it needs a yes or no before acting. */
+export type AgentRun = {
+  thread_id: string;
+  device_id: string;
+  stage: "waiting" | "done";
+  agents: AgentReport[];
+  total_ms: number;
+  explanation: string;
+  steps: string[];
+  action: { device_id: string; command: string; args: Record<string, unknown>; label: string } | null;
+  sources: string[];
+  preferences: Record<string, unknown>;
+  outcome: string | null;
+  acted: boolean; // true only when a device really changed
+};
+
+export type AgentsStats = {
+  cache: { hits: number; misses: number; hit_rate: number | null; prefetched: number; prefetch_hits: number } | null;
+  preferences: Record<string, Record<string, unknown>>;
+  domains: string[];
+  push: boolean;
+};
+
 export type SpeechSay = { text: string; card_id: string; priority: "normal" | "update" };
 export type DemoStep = { index?: number; total?: number; text?: string; done?: boolean };
 type Empty = Record<string, never>;
@@ -50,6 +76,8 @@ export type ServerMessage =
   | { type: "demo.step"; data: DemoStep }
   | { type: "ui.hood"; data: { open: boolean } }
   | { type: "session.reset"; data: Empty }
+  | { type: "agent.update"; data: AgentRun }
+  | { type: "agents.stats"; data: AgentsStats }
   | { type: "error"; data: { message: string } };
 
 export type ScenarioId = "washer_e3" | "washer_done" | "ac_spike" | "dryer_done" | "reset";
@@ -61,4 +89,6 @@ export type ClientMessage =
   | { type: "speech.barge_in" | "speech.done"; data: Empty }
   | { type: "action.confirm"; data: { card_id: string; confirmed: boolean } }
   | { type: "plan.resume"; data: { plan_id: string } }
-  | { type: "replay.start"; data: { script_id: string } };
+  | { type: "replay.start"; data: { script_id: string } }
+  | { type: "agent.start"; data: { device_id: string; question?: string } }
+  | { type: "agent.decide"; data: { thread_id: string; approve: boolean } };

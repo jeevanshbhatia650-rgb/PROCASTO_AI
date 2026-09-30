@@ -141,3 +141,21 @@ def test_a_real_samsung_code_is_answered_from_the_fault_table(client):
         card = read_until(ws, "card.upsert", where=problem)[-1]["data"]
         assert card["title"] == "4C · No water coming in - the fill timed out"
         assert card["sources"][0]["label"] == "Samsung washer fault codes §4E"
+
+
+def test_the_three_agents_diagnose_and_act_only_after_a_yes(client):
+    with demo_session(client, "agents-flow") as (ws, _, _):
+        ws.send_json({"type": "sim.trigger", "data": {"scenario": "washer_e3"}})
+        read_until(ws, "device.update", where=lambda m: m["data"]["attributes"].get("state") == "ERROR")
+        ws.send_json({"type": "agent.start", "data": {"device_id": "washer-01"}})
+        report = read_until(ws, "agent.update")[-1]["data"]
+        assert report["stage"] == "waiting" and {a["agent"] for a in report["agents"]} == {
+            "home_state", "manual", "preferences"
+        }  # fmt: skip
+        stats = read_until(ws, "agents.stats")[-1]["data"]
+        assert stats["preferences"]["ac-01"]["preferred_target_c"] == 24 and stats["cache"]["misses"] >= 1
+        ws.send_json({"type": "agent.decide", "data": {"thread_id": report["thread_id"], "approve": True}})
+        done = read_until(ws, "agent.update")[-1]["data"]
+        assert done["outcome"] == "Washer restarted"
+        ws.send_json({"type": "agent.decide", "data": {"thread_id": "not-a-thread", "approve": True}})
+        assert read_until(ws, "error")[-1]["data"]["message"].startswith("invalid agent.decide")

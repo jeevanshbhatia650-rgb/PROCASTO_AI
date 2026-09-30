@@ -8,6 +8,7 @@ from app.core.models import DeviceKind
 
 _RATED = re.compile(r"rated[^.]*?(\d+(?:\.\d+)?)\s*kW\b", re.IGNORECASE)
 AC_COMFORT_TARGET_C = 24.0
+MIN_AC_TARGET_C, MAX_AC_TARGET_C = 16.0, 30.0
 
 
 @dataclass(frozen=True)
@@ -137,10 +138,13 @@ def energy_text(name: str, attrs: dict[str, Any], hit: dict[str, Any] | None, ph
     return CardText(f"{name} drawing {fmt_power(power)}", f"{fact} {detail}".strip(), speak, severity)
 
 
-def energy_command(kind: DeviceKind, attrs: dict[str, Any]) -> CommandSpec | None:
+def energy_command(kind: DeviceKind, attrs: dict[str, Any], usual: float | None = None) -> CommandSpec | None:
+    """A warmer target when the AC is set colder than comfortable: the usual one, if the Preference agent knows it."""
     target = attrs.get("target_temp_c")
-    if kind == DeviceKind.AC and target is not None and target < AC_COMFORT_TARGET_C:
-        return CommandSpec("set_target_temp", {"value": AC_COMFORT_TARGET_C}, f"Set to {AC_COMFORT_TARGET_C:g} °C")
+    comfort = usual if usual is not None and MIN_AC_TARGET_C <= usual <= MAX_AC_TARGET_C else AC_COMFORT_TARGET_C
+    if kind == DeviceKind.AC and target is not None and target < comfort:
+        label = f"Set to {comfort:g} °C" + (" · your usual" if comfort == usual else "")
+        return CommandSpec("set_target_temp", {"value": comfort}, label)
     return None
 
 

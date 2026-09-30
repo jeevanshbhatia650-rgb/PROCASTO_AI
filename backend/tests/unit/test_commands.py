@@ -82,7 +82,8 @@ async def test_confirming_an_energy_suggestion_changes_the_simulated_ac(env):
     await session.on_final("why is the AC using so much power", 1)
     await session.pipeline.orchestrator.drain()
     info = next(c for c in session.composer.cards_for(session.engine.active().plan_id) if c.type == CardType.INFO)
-    assert info.command.label == "Set to 24 °C"
+    assert info.command.label == "Set to 24 °C · your usual"  # the Preference agent knows this home's habit
+    assert any("your usual settings" in s.label for s in info.sources)
     await session.on_confirm(info.card_id, True)
     await session.pipeline.orchestrator.drain()
     assert ctx.store.get("ac-01").attributes["target_temp_c"] == 24.0
@@ -101,3 +102,16 @@ async def test_spoken_request_becomes_a_confirm_card(env):
     await session.on_confirm(confirm.card_id, True)
     assert ctx.store.get("ac-01").attributes["target_temp_c"] == 25.0
     assert session.composer.card(confirm.card_id).title == "AC set to 25 °C"
+
+
+async def test_the_preference_agent_suggests_the_homes_own_habit(env):
+    ctx, session, _ = env
+    ctx.preferences.set("ac-01", "preferred_target_c", 26.0)
+    await ctx.simulator.trigger("ac_spike")
+    await session.on_final("why is the AC using so much power", 1)
+    await session.pipeline.orchestrator.drain()
+    info = next(c for c in session.composer.cards_for(session.engine.active().plan_id) if c.type == CardType.INFO)
+    assert info.command.label == "Set to 26 °C · your usual"
+    await session.on_confirm(info.card_id, True)
+    await session.pipeline.orchestrator.drain()
+    assert ctx.preferences.get("ac-01")["preferred_target_c"] == 26.0  # a confirmed action reinforces the habit

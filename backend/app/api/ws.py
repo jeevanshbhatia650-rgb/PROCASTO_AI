@@ -64,6 +64,16 @@ class TriggerIn(BaseModel):
     scenario: Literal["washer_e3", "washer_done", "ac_spike", "dryer_done", "reset"]
 
 
+class AgentStartIn(BaseModel):
+    device_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{1,80}$")
+    question: str = Field(default="", max_length=300)
+
+
+class AgentDecideIn(BaseModel):
+    thread_id: str = Field(pattern=r"^[a-f0-9]{16}$")
+    approve: bool
+
+
 class Empty(BaseModel):
     pass
 
@@ -107,6 +117,8 @@ def _handlers(ctx: AppContext, session: Session, send: Send) -> Handlers:
         "plan.resume": (ResumeIn, lambda m: session.on_resume_plan(m.plan_id)),
         "replay.start": (ReplayIn, lambda m: _replay(session, ctx, send, m.script_id)),
         "sim.trigger": (TriggerIn, lambda m: _trigger(ctx, send, m.scenario)),
+        "agent.start": (AgentStartIn, lambda m: session.on_agent_start(m.device_id, m.question)),
+        "agent.decide": (AgentDecideIn, lambda m: session.on_agent_decide(m.thread_id, m.approve)),
     }
 
 
@@ -215,6 +227,7 @@ async def _run_session(websocket: WebSocket, session_id: str, ctx: AppContext, u
             },
         )
         send("devices.snapshot", ctx.store.all())
+        send("agents.stats", session.agents_stats())
         await _serve(websocket, _handlers(ctx, session, send), send)
     except WebSocketDisconnect:
         pass

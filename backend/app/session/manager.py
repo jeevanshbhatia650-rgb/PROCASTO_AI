@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.agent.diagnose import DiagnoseAgent
+from app.agent.intent import prefetch, session_domains
 from app.answer.composer import Composer
 from app.answer.templates import CardText, spoken_name
 from app.context import AppContext
@@ -72,8 +74,8 @@ class Session:
         self.extractor = ClauseExtractor(ctx.lexicon, ctx.settings.clause_stability_n)
         retrievers = {
             "live_state": LiveStateRetriever(ctx.store, "smartthings" if ctx.simulator is None else "simulator"),
-            "manual": ManualRetriever(ctx.manuals, ctx.infos, ctx.clock),
-            "session": SessionRetriever(self.context, ctx.clock),
+            "manual": ManualRetriever(ctx.manuals, ctx.infos, ctx.clock, ctx.manual_cache),
+            "session": SessionRetriever(self.context, ctx.clock, ctx.preferences),
         }
         self.pipeline = Pipeline(
             self.engine,
@@ -89,6 +91,8 @@ class Session:
         self._utterance: Utterance | None = None
         self._severity: dict[str, str] = {}
         self._spoken_plan: str | None = None
+        self._prefetch_task: asyncio.Task[None] | None = None
+        self._diagnose: DiagnoseAgent | None = None  # built on first use
 
     async def reset(self) -> None:
         await self._stop_work()
@@ -102,6 +106,8 @@ class Session:
         await self._stop_work()
 
     async def _stop_work(self) -> None:
+        if self._prefetch_task:
+            self._prefetch_task.cancel()
         if self._speech_task:
             self._speech_task.cancel()
         self.composer.cancel_llm()
@@ -129,6 +135,65 @@ class Session:
         if self._speech_task:
             self._speech_task.cancel()
         self._speech_task = asyncio.create_task(self._speak_when_settled(utt))
+        if self._ctx.manual_cache is not None and not (self._prefetch_task and not self._prefetch_task.done()):
+            self._prefetch_task = asyncio.create_task(self._think_ahead())
+
+    # ---------- the three agents ----------
+
+    async def _think_ahead(self) -> None:
+        """The Slow Thinker: while the answer is spoken, warm the Manual agent's cache for this session's domain."""
+        ctx = self._ctx
+        if ctx.manual_cache is None:
+            return
+        try:
+            await prefetch(
+                ctx.manuals,
+                ctx.manual_cache,
+                self.context.recent_devices(),
+                ctx.infos,
+                lambda d: ctx.store.get(d).attributes.get("error_code"),
+            )
+        except Exception:  # prefetch is an optimisation: a failure must never reach the person
+            log.exception("prefetch failed")
+        self._send("agents.stats", self.agents_stats())
+
+    def agents_stats(self) -> dict[str, Any]:
+        ctx = self._ctx
+        prefs = {d: p for d in ctx.infos if (p := ctx.preferences.get(d))}
+        return {
+            "cache": ctx.manual_cache.stats.as_payload() if ctx.manual_cache else None,
+            "preferences": prefs,
+            "domains": sorted(session_domains(self.context.recent_devices(), ctx.infos)),
+            "push": ctx.simulator is None,  # real homes are fed by SmartThings webhooks; the demo by the simulator
+        }
+
+    @property
+    def diagnose(self) -> DiagnoseAgent:
+        if self._diagnose is None:
+            self._diagnose = DiagnoseAgent(self._ctx)
+        return self._diagnose
+
+    async def on_agent_start(self, device_id: str, question: str) -> None:
+        try:
+            report = await self.diagnose.start(device_id, question or "What is wrong and how do I fix it?")
+        except ValueError as exc:
+            self._send("error", {"message": str(exc)})
+            return
+        self._send("agent.update", report)
+        self.context.note_devices([device_id])  # the session is now about this device's domain
+        if self._ctx.manual_cache is not None and not (self._prefetch_task and not self._prefetch_task.done()):
+            self._prefetch_task = asyncio.create_task(self._think_ahead())  # sends the stats when done
+        else:
+            self._send("agents.stats", self.agents_stats())
+
+    async def on_agent_decide(self, thread_id: str, approve: bool) -> None:
+        try:
+            report = await self.diagnose.decide(thread_id, approve)
+        except ValueError as exc:
+            self._send("error", {"message": str(exc)})
+            return
+        self._send("agent.update", report)
+        self._send("agents.stats", self.agents_stats())
 
     async def on_barge_in(self) -> None:
         self.speech.interrupt("barge-in")

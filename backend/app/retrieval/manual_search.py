@@ -3,6 +3,7 @@
 import asyncio
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -13,6 +14,7 @@ from app.core.models import DeviceInfo, Evidence, RetrievalTask
 from app.retrieval.base import evidence_id
 from app.retrieval.embedder import Embedder
 from app.retrieval.manual_ingest import Section
+from app.retrieval.semantic_cache import SemanticCache
 
 RRF_K = 60
 EXACT_CODE_BOOST = 1.0  # an exact error-code heading always outranks fuzzy matches
@@ -88,6 +90,10 @@ class ManualIndex:
     def sections(self) -> list[Section]:
         return list(self._sections)
 
+    def query_embedder(self) -> "Callable[[str], np.ndarray] | None":
+        """The dense model's query embedding, for the semantic cache; None when dense search is off."""
+        return self._embedder.embed_query if self._embedder else None
+
     @property
     def dense_model(self) -> str | None:
         return self._embedder.name if self._embedder else None
@@ -128,14 +134,18 @@ class ManualIndex:
 
 
 class ManualRetriever:
-    def __init__(self, index: ManualIndex, infos: dict[str, DeviceInfo], clock: Clock) -> None:
-        self._index, self._infos, self._clock = index, infos, clock
+    """The Manual agent: hybrid search over the manuals, behind a semantic cache shared by the whole home."""
+
+    def __init__(
+        self, index: ManualIndex, infos: dict[str, DeviceInfo], clock: Clock, cache: SemanticCache | None = None
+    ) -> None:
+        self._index, self._infos, self._clock, self._cache = index, infos, clock, cache
 
     async def retrieve(self, task: RetrievalTask) -> Evidence:
         info = self._infos[task.device_id or ""]
         match = _LEADING_CODE.match(task.query)
         code = match.group(1) if match else None
-        hits = await asyncio.to_thread(self._index.search, task.query, info.model_id, info.family, code, 2)
+        hits, cache = await search_cached(self._index, self._cache, task.query, info, code)
         top = hits[0].section if hits else None
         return Evidence(
             evidence_id=evidence_id(task),
@@ -147,6 +157,20 @@ class ManualRetriever:
             observed_at=self._clock.now(),
             device_revision=None,
             plan_revision=task.plan_revision,
-            payload={"hits": [h.as_payload() for h in hits], "error_code": code},
+            payload={"hits": [h.as_payload() for h in hits], "error_code": code, "cache": cache},
             citation=top.citation if top else f"{info.model_id} manual · no match",
         )
+
+
+async def search_cached(
+    index: ManualIndex, cache: SemanticCache | None, query: str, info: DeviceInfo, code: str | None
+) -> tuple[list[Hit], str]:
+    """Hits for a question, and whether the semantic cache answered ("hit"), or the index did ("miss", "off")."""
+    if cache is not None:
+        found = await asyncio.to_thread(cache.get, info.model_id, code, query)
+        if found is not None:
+            return found[0], "hit"
+    hits = await asyncio.to_thread(index.search, query, info.model_id, info.family, code, 2)
+    if cache is not None:
+        cache.put(info.model_id, code, query, hits)
+    return hits, "miss" if cache is not None else "off"

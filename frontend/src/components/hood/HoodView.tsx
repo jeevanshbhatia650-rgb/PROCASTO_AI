@@ -1,4 +1,5 @@
 import { LiveTranscript } from "../user/LiveTranscript";
+import { AgentsStats } from "./AgentsStats";
 import { EventFeed } from "./EventFeed";
 import { LeadTimeBadge } from "./LeadTimeBadge";
 import { TaskList } from "./TaskList";
@@ -27,6 +28,7 @@ export function HoodView() {
         </div>
       </section>
       <TranscriptPanel />
+      <AgentsStats />
       <TaskList />
       <EventFeed />
     </aside>

@@ -87,6 +87,17 @@ async def demo_fault_to_answer(page: Page, base: str) -> None:
     await fits_the_screen(page)
     step("the engine view opens, with the words it heard")
 
+    await expect(page.get_by_role("region", name="The three agents")).to_be_visible()
+    agents = page.get_by_role("region", name="Diagnose & fix")
+    await agents.get_by_role("group", name="Device to diagnose").get_by_role("button", name=re.compile("Washer")).click()
+    await expect(agents.get_by_text("Home State agent")).to_be_visible()
+    restart = agents.get_by_role("button", name="Restart the washer")
+    await expect(restart).to_be_visible(timeout=20000)
+    step("three agents diagnose the washer side by side and wait for a yes")
+    await restart.click()
+    await expect(agents.get_by_text("Washer restarted")).to_be_visible(timeout=10000)
+    step("after the yes, the agent acts through the safety gate")
+
 
 async def guards(page: Page, base: str) -> None:
     await page.goto(base + "/app")

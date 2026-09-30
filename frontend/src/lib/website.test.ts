@@ -117,3 +117,17 @@ describe("store", () => {
     expect(next.hello?.home).toBe("demo");
   });
 });
+
+describe("the three agents", () => {
+  it("shows a run as working until its report arrives, and an error ends the wait", () => {
+    const busy: Data = { ...initialData, agentBusy: "washer-01" };
+    const run = {
+      thread_id: "0123456789abcdef", device_id: "washer-01", stage: "waiting" as const, agents: [], total_ms: 4,
+      explanation: "E3", steps: [], action: null, sources: [], preferences: {}, outcome: null, acted: false,
+    };
+    expect(reduce(busy, { type: "agent.update", data: run })).toMatchObject({ agentRun: run, agentBusy: null });
+    expect(reduce(busy, { type: "error", data: { message: "Unknown device" } }).agentBusy).toBeNull();
+    const hello = { session_id: "s", home: "demo" as const, signed_in: false, notice: "", llm: "templates", dense_model: null };
+    expect(reduce({ ...initialData, agentRun: run }, { type: "hello", data: hello }).agentRun).toBeNull();
+  });
+});

@@ -16,6 +16,13 @@ from app.core.models import (
 )
 from app.planning.plan_types import META, OPEN, PlanDiff, PlanState
 
+# The Manual agent's questions, shared with the prefetcher so a warmed cache entry matches exactly.
+ENERGY_QUERY = "power consumption energy use"
+
+
+def error_query(code: str | None) -> str:
+    return f"{code} error meaning fix" if code else "error meaning fix"
+
 
 class QueryPlanEngine:
     def __init__(
@@ -191,11 +198,11 @@ class QueryPlanEngine:
             return [live]
         if clause.intent == Intent.ERROR_LOOKUP:
             code = clause.error_code or (self._current_error(device) if device else None) or ""
-            return [live, ("manual", device, f"{code} error meaning fix".strip())]
+            return [live, ("manual", device, error_query(code))]
         if clause.intent == Intent.ENERGY:
             return [
                 live,
-                ("manual", device, "power consumption energy use"),
+                ("manual", device, ENERGY_QUERY),
                 ("session", device, "recent conversation"),
             ]
         return []

@@ -8,7 +8,7 @@ import type {
   RetrievalTask,
   TimelineEvent,
 } from "../types/generated";
-import type { ClausesUpdate, DemoStep, Hello, ServerMessage, SpeechSay } from "./protocol";
+import type { AgentRun, AgentsStats, ClausesUpdate, DemoStep, Hello, ServerMessage, SpeechSay } from "./protocol";
 
 type Turn = { id: string; text: string };
 type Connection = "connecting" | "open" | "closed";
@@ -33,6 +33,9 @@ export type Data = {
   toast: { id: number; message: string } | null;
   clockOffset: number; // Date.now() minus the server's session clock, to place "now" on the timeline
   power: number[]; // whole-home watts, one sample every POWER_SAMPLE_MS, oldest first
+  agentRun: AgentRun | null; // the latest diagnose-and-act run
+  agentBusy: string | null; // the device a run is working on, until its report arrives
+  agentsStats: AgentsStats | null;
 };
 
 const MAX_TIMELINE = 500;
@@ -68,11 +71,14 @@ export const initialData: Data = {
   toast: null,
   clockOffset: 0,
   power: EMPTY_POWER,
+  agentRun: null,
+  agentBusy: null,
+  agentsStats: null,
 };
 
 const SESSION_RESET = {
   transcript: null, turns: [], plan: null, parked: [], tasks: {}, cards: {}, timeline: [],
-  metrics: EMPTY_METRICS, speech: null, demo: null, power: EMPTY_POWER,
+  metrics: EMPTY_METRICS, speech: null, demo: null, power: EMPTY_POWER, agentRun: null, agentBusy: null,
 } satisfies Partial<Data>;
 
 let counter = 0;
@@ -139,8 +145,12 @@ export function reduce(state: Data, msg: ServerMessage, receivedAt = Date.now())
       return { hoodOpen: msg.data.open };
     case "session.reset":
       return { ...SESSION_RESET, stopSpeech: state.stopSpeech + 1 };
+    case "agent.update":
+      return { agentRun: msg.data, agentBusy: null };
+    case "agents.stats":
+      return { agentsStats: msg.data };
     case "error":
-      return { toast: { id: nextId(), message: msg.data.message } };
+      return { toast: { id: nextId(), message: msg.data.message }, agentBusy: null };
   }
 }
 
@@ -151,6 +161,7 @@ type Actions = {
   toggleVoice: () => void;
   showToast: (message: string) => void;
   samplePower: () => void;
+  startAgent: (deviceId: string) => void;
   clearPrivate: () => void;
 };
 
@@ -163,5 +174,6 @@ export const useStore = create<Data & Actions>()((set) => ({
   showToast: (message) => set({ toast: { id: nextId(), message } }),
   samplePower: () =>
     set((state) => (Object.keys(state.devices).length ? { power: withPowerSample(state.power, state.devices) } : state)),
+  startAgent: (deviceId) => set({ agentBusy: deviceId, agentRun: null }),
   clearPrivate: () => set((state) => ({ ...initialData, connection: "closed", stopSpeech: state.stopSpeech + 1 })),
 }));

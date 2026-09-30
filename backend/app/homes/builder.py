@@ -2,6 +2,7 @@
 
 import httpx
 
+from app.agent.preferences import DEMO_PREFERENCES, PreferenceStore
 from app.config import Settings, load_devices
 from app.context import AppContext
 from app.core.bus import Bus
@@ -13,6 +14,7 @@ from app.devices.smartthings.provider import SmartThingsProvider
 from app.llm.base import AnswerModel
 from app.nlu.lexicon import Lexicon
 from app.retrieval.manual_search import ManualIndex
+from app.retrieval.semantic_cache import SemanticCache
 from app.state.live_store import LiveStore
 
 
@@ -38,6 +40,9 @@ def build_home(
     else:
         simulator = Simulator(devices, initial, store.apply, clock, seed=settings.sim_seed)
         provider = simulator
+    preferences = PreferenceStore(DEMO_PREFERENCES if simulator is not None else None)
+    commands = CommandGate(provider, infos, real_devices=simulator is None, allow_real=settings.allow_commands)
+    commands.on_done = preferences.learn
     return AppContext(
         settings=settings,
         clock=clock,
@@ -49,6 +54,8 @@ def build_home(
         manuals=manuals,
         llm=llm,
         lexicon=Lexicon(devices, manuals.model_ids(), manuals.error_codes()),
-        commands=CommandGate(provider, infos, real_devices=simulator is None, allow_real=settings.allow_commands),
+        commands=commands,
         notice=notice,
+        preferences=preferences,
+        manual_cache=SemanticCache(manuals.query_embedder()),
     )

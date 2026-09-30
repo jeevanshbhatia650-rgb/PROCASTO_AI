@@ -202,9 +202,11 @@ class Composer:
         card_id = self._card_id(plan, info, CardType.INFO)
         phrase = self._phrase(card_id, Intent.ENERGY, facts.plain(), hit["text"], used) if hit else None
         sources = [_live_source(live), *_manual_sources(hit)]
-        if clause.params.get("resolved_from"):
-            session = self._done_evidence(plan, info.device_id, "session")
-            sources += [Source(kind="session", label=session.citation)] if session else []
+        session = self._done_evidence(plan, info.device_id, "session")
+        usual = (session.payload.get("preferences") or {}).get("preferred_target_c") if session else None
+        command = energy_command(info.kind, attrs, usual)
+        if session and (clause.params.get("resolved_from") or (command and command.args["value"] == usual)):
+            sources.append(Source(kind="session", label=session.citation))  # the Preference agent grounded this
         self._add(
             cards,
             plan,
@@ -213,7 +215,7 @@ class Composer:
             energy_text(info.display_name, attrs, hit, phrase),
             used,
             sources,
-            energy_command(info.kind, attrs),
+            command,
         )
 
     def _confirm_card(

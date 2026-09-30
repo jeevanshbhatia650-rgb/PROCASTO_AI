@@ -2,6 +2,7 @@
 
 import logging
 from collections import OrderedDict
+from collections.abc import Callable
 
 from app.core.models import CardCommand, DeviceInfo
 from app.devices.provider import DeviceProvider
@@ -33,6 +34,7 @@ class CommandGate:
         self._real_devices = real_devices
         self._allow_real = allow_real
         self._done: OrderedDict[str, str] = OrderedDict()
+        self.on_done: Callable[[CardCommand], None] = lambda command: None  # e.g. teach the Preference agent
 
     async def execute(self, command: CardCommand, idempotency_key: str) -> str:
         if idempotency_key in self._done:
@@ -51,6 +53,7 @@ class CommandGate:
             raise CommandError(f"The {name} didn't respond, so nothing was changed. Try again in a moment.") from exc
         message = describe(command, name)
         self._done[idempotency_key] = message
+        self.on_done(command)
         while len(self._done) > REMEMBERED_COMMANDS:
             self._done.popitem(last=False)
         return message

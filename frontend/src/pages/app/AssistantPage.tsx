@@ -7,6 +7,7 @@ import { HoodView } from "../../components/hood/HoodView";
 import { SpeakerIcon } from "../../components/icons";
 import { HoodToggle } from "../../components/layout/HoodToggle";
 import { SplitPane } from "../../components/layout/SplitPane";
+import { AgentPanel } from "../../components/user/AgentPanel";
 import { AnswerCards } from "../../components/user/AnswerCards";
 import { ChatPanel } from "../../components/user/ChatPanel";
 import { DeviceGrid } from "../../components/user/DeviceGrid";
@@ -73,6 +74,9 @@ export default function AssistantPage() {
             </ErrorBoundary>
             <ErrorBoundary name="answers">
               <AnswerCards />
+            </ErrorBoundary>
+            <ErrorBoundary name="agents">
+              <AgentPanel />
             </ErrorBoundary>
           </>
         }

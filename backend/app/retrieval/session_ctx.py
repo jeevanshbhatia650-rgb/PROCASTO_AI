@@ -3,6 +3,7 @@
 from collections import deque
 from dataclasses import dataclass
 
+from app.agent.preferences import PreferenceStore
 from app.core.ids import Clock
 from app.core.models import Clause, Evidence, RetrievalTask
 from app.retrieval.base import evidence_id
@@ -32,6 +33,9 @@ class SessionContext:
     def turns(self) -> list[Turn]:
         return list(self._turns)
 
+    def recent_devices(self) -> list[str]:
+        return list(self._recent)
+
     def last_device(self) -> str | None:
         return self._recent[-1] if self._recent else None
 
@@ -51,12 +55,16 @@ class SessionContext:
 
 
 class SessionRetriever:
-    def __init__(self, context: SessionContext, clock: Clock) -> None:
+    """The Preference agent: what this conversation has covered, plus the home's remembered habits (a KV read)."""
+
+    def __init__(self, context: SessionContext, clock: Clock, preferences: PreferenceStore | None = None) -> None:
         self._context = context
         self._clock = clock
+        self._preferences = preferences
 
     async def retrieve(self, task: RetrievalTask) -> Evidence:
         turns = self._context.turns()
+        prefs = self._preferences.get(task.device_id) if self._preferences and task.device_id else {}
         return Evidence(
             evidence_id=evidence_id(task),
             task_id=task.task_id,
@@ -70,6 +78,7 @@ class SessionRetriever:
             payload={
                 "turns": [{"text": t.text, "devices": list(t.device_ids)} for t in turns],
                 "last_device": self._context.last_device(),
+                "preferences": prefs,
             },
-            citation=f"session · last {len(turns)} turns",
+            citation=f"session · last {len(turns)} turns" + (" · your usual settings" if prefs else ""),
         )

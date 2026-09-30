@@ -100,3 +100,13 @@ Every entry is a state that was verified to work. Before changing a module liste
 - Render: `cd video && npx remotion render Promo out/procasto-promo.mp4`. Web copy with music (720p, faststart, ~4 MB) and poster in `frontend/public/media/`.
 - On the site: "See it in 90 seconds" section right after the hero plus a link under the hero buttons; plays muted only while on screen, never autoplays with reduced motion. Served with range requests (206).
 - Gotcha: OneDrive marks folders with a reparse point that Node sees as a symlink, so Remotion can't copy a folder inside `public/`. Keep public assets flat.
+
+## [Agents] Three-agent architecture - WORKING ✅ (2026-09-30)
+- Home State agent: the live snapshot, fed by pushed events (SmartThings webhooks / simulator), read in < 1 ms.
+- Manual agent: hybrid BM25 + dense with RRF, now behind a per-home semantic cache (`app/retrieval/semantic_cache.py`): exact repeats are a dict lookup, near questions reuse at cosine >= 0.60, and the error code is part of the key so E3 and E4 never share an answer.
+- Preference agent: a per-home key-value store (`app/agent/preferences.py`, in memory, Redis-shaped), seeded for the demo home, taught by confirmed actions, fading after a month. It grounds the energy suggestion ("Set to 24 °C · your usual").
+- Slow Thinker (`app/agent/intent.py`): after each question or diagnosis it reads the session's intent (laundry / climate) and warms the cache for the whole domain while the answer is spoken.
+- LangGraph (`app/agent/diagnose.py`): START fans out to the three agents in parallel, fans in to propose (Gemini via LangChain structured output, rules fallback), pauses at confirm (interrupt + InMemorySaver checkpointer), then acts through CommandGate. The model explains; the action is the model's if allowed, else the rules' one; always behind a yes.
+- Website: "Diagnose & fix" panel on the Assistant page (device chips, three agent tiles with ms, steps, sources, confirm), "The three agents" card under the hood (cache hit rate, prefetch, preferences).
+- The streaming voice engine is unchanged apart from the cache in front of manual search and preferences in session evidence.
+- Tests: backend 310, frontend 55, e2e 27 checks at 1440 and 390 px on the production build.

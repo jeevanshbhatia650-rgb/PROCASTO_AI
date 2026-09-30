@@ -1,4 +1,4 @@
-# Real Samsung appliance data (for embedding)
+# Real Samsung appliance data
 
 Plain CSV, UTF-8, one row per fault code. Rebuild with `cd backend && uv run python -m scripts.export_real_data`
 (both sources are pinned to one commit, so a rebuild gives the same rows).
@@ -12,7 +12,7 @@ Plain CSV, UTF-8, one row per fault code. Rebuild with `cd backend && uv run pyt
 | `AR12.md` air conditioner | **none found** (see below) | stays sample |
 | (not in the demo yet) | refrigerator and dishwasher rows of `samsung_appliance_codes.csv` | 14 + 14 codes (US) |
 
-The washer fault table is already inside the app (`SAMSUNG_WASHER_FAULTS.md`); the rest is here for embedding.
+The washer fault table is inside the app as a manual (`SAMSUNG_WASHER_FAULTS.md`); the appliance codes are inside it as a vector database (below).
 
 ## Files
 
@@ -28,34 +28,39 @@ the key is `(appliance_type, market, code)`.
 Suggested embedding text per row: `"{appliance_type} {code}: {meaning}. {what_to_do or fix_steps}"`, and keep `code`
 and `appliance_type` as filters so a dryer question never returns a washer answer.
 
-## How to embed the data
+## Embedded: the ChromaDB vector database
 
-Use **fastembed** with the `BAAI/bge-small-en-v1.5` model (133 MB, downloads on first run):
+`samsung_appliance_codes.csv` is embedded in **ChromaDB** at [`backend/data/vector_db/`](../../backend/data/vector_db)
+(collection `samsung_appliance_codes`, 84 rows, cosine distance) with `BAAI/bge-small-en-v1.5`, the model the manual
+search already uses, so the app embeds questions with the same model. The app opens it at startup
+([`vector_db.py`](../../backend/app/retrieval/vector_db.py)): codes the manuals lack are looked up by appliance and
+code, and the conversation searches it by meaning.
+
+To rebuild it (for example after adding rows):
 
 ```python
-from fastembed import SparseEmbedding, FlagModel
 import csv
 
-# Load the embedding model (downloads once to ~/.cache/)
-model = FlagModel("BAAI/bge-small-en-v1.5", cache_dir="/path/to/cache")
+import chromadb
+from fastembed import TextEmbedding
 
-# Read your CSV and embed each row
-embeddings = []
-with open("samsung_washer_faults.csv") as f:
-    for row in csv.DictReader(f):
-        text = f"{row['appliance_type']} {row['code']}: {row['meaning']}. {row['what_to_do']}"
-        embedding = model.embed(text)  # returns numpy array, shape (384,)
-        embeddings.append({
-            "code": row["code"],
-            "appliance_type": row["appliance_type"],
-            "embedding": embedding.tolist()  # convert to list for storage
-        })
-
-# Store embeddings in your vector DB (e.g., Supabase pgvector, Milvus, Weaviate)
-# Index by (appliance_type, code) to filter by device type before search
+model = TextEmbedding("BAAI/bge-small-en-v1.5")
+client = chromadb.PersistentClient(path="backend/data/vector_db")
+collection = client.get_or_create_collection("samsung_appliance_codes", metadata={"hnsw:space": "cosine"})
+with open("data/real/samsung_appliance_codes.csv", encoding="utf-8") as f:
+    rows = list(csv.DictReader(f))
+docs = [
+    f"Samsung {r['appliance_type'].title()} error code '{r['code']}' indicates: {r['meaning']} "
+    f"Troubleshooting and repair steps: {r['fix_steps'].replace(' | ', ' ')}"
+    for r in rows
+]
+collection.upsert(
+    ids=[f"{r['appliance_type']}_{r['market']}_{r['code']}_{i}" for i, r in enumerate(rows)],
+    documents=docs,
+    embeddings=[e.tolist() for e in model.passage_embed(docs)],
+    metadatas=[{k: r[k] for k in ("brand", "market", "appliance_type", "code", "component", "severity")} for r in rows],
+)
 ```
-
-**Why this model:** 384 dimensions, fast on CPU, 0.3 MB/batch on typical hardware, semantic cache reuse at cosine ≥ 0.60 works well. Dense search is optional — BM25 alone (no embeddings) works too.
 
 ## Sources and licences (keep these with the data)
 

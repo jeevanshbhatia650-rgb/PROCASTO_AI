@@ -27,8 +27,10 @@ Engineering and Technology
    and an AC, live.
 2. Press **1**: the washer breaks with **E3** (keys **1** to **5** each break something). A followed device raises an alert with
    an **Ask** button.
-3. Open **Assistant** and ask, by voice (Chrome or Edge, hold **Space**) or typing: *"What does 4C mean on the washer?"*
-   The answer comes from **real Samsung fault-code data** with the fix steps and its source.
+3. Open **Assistant** and talk to it, by voice (Chrome or Edge, hold **Space**) or typing: *"Hey, what's going on with
+   my washer?"* PROCASTO answers back like a person, out loud, and remembers the thread: follow up with *"OK, what
+   should I do first?"* Cards under the conversation show the evidence and its source. Try codes the manuals don't
+   have: *"What does HC2 mean on the dryer?"* or *"My dishwasher shows 5C"*, answered from the **vector database**.
 4. Under **Diagnose & fix**, pick the washer: **three agents** look at it side by side, one fix is proposed, and nothing
    changes until you press **Restart the washer**.
 5. Switch on **Under the hood**: the words it heard, the clauses it understood, every retrieval on a
@@ -66,20 +68,33 @@ Smart-home apps show *what*, never *why*. PROCASTO explains the fault, from the 
   - **Home State agent**: the live snapshot, kept fresh by **pushed** events (SmartThings webhooks, or the
     simulator). Never polled; a read takes < 1 ms.
   - **Manual agent**: hybrid **BM25 + dense** (fastembed `bge-small-en-v1.5`) fused with **RRF (k = 60)**, an exact
-    error-code boost (dense search alone misses codes like "E3"), filtered by model then family. Behind a **semantic
-    cache**: an exact repeat is a dict lookup, a close question (cosine ≥ 0.60) reuses the answer, and the error code
-    is part of the key so E3 and E4 never share one.
+    error-code boost (dense search alone misses codes like "E3"), filtered by model then family. A code the manuals
+    lack falls through to the **ChromaDB vector database** (84 real Samsung codes). Behind a **semantic cache**: an
+    exact repeat is a dict lookup, a close question (cosine ≥ 0.60) reuses the answer, and the error code is part of
+    the key so E3 and E4 never share one.
   - **Preference agent**: a per-home **key-value store** of habits ("usually 30 °C", "likes 24 °C"), < 1 ms, taught
     by the actions you confirm, fading after a month. It grounds suggestions: *Set to 24 °C · your usual*.
 - **Slow Thinker (session-intent prefetch).** While an answer is spoken, it reads the session's intent (laundry,
   climate) and warms the cache for the whole domain, so a pivot from washer to dryer lands warm.
 - **Park and resume.** A correction to another device parks the plan with its evidence. Resume reuses what is still
   fresh and refetches what changed.
-- **Precedence is code, not the LLM.** Live readings beat the conversation, which beats manual defaults. Gemini only
-  phrases one sentence from resolved facts; the manual's own words show first and stay if the model is slow.
+- **One-to-one conversation.** Every question gets a spoken reply that follows the thread (the last six turns). Each
+  turn the model is handed everything it may use: live readings, each device's own manual for the code on its
+  display, the answer cards, and the nearest codes from the vector database by meaning.
+- **Vector database (ChromaDB).** 84 real Samsung washer, dryer, fridge and dishwasher codes (ApplianceDB, ODbL),
+  embedded with the same `bge-small-en-v1.5` model the manual search uses, so a question and a code share one vector
+  space. Two ways in: an exact metadata filter (appliance + code) for the pipeline, nearest neighbours for the
+  conversation.
+- **Model tiers that don't run out.** Gemini 3.1 Flash-Lite, **Gemma 4** (Google's open-weights model), Gemini 3.5
+  Flash-Lite and more, each with its own free quota, plus optional Groq, OpenRouter and Hugging Face models. A tier
+  that is rate-limited, overloaded or retired rests and the next answers; a tier slower than 2 s gets the next one
+  racing alongside it (hedged requests), first answer wins. If every model is down, the answer cards speak.
+- **Precedence is code, not the LLM.** Live readings beat the conversation, which beats manual defaults, and a
+  device's own manual beats the general database. The model only talks: a reply claiming it changed a device is
+  thrown away, because only the card's button can.
 
 **LangGraph agent** (Diagnose & fix): `START → [home_state | manual | preferences]` in parallel `→ propose` (Gemini
-via LangChain structured output, rules fallback) `→ confirm` (LangGraph `interrupt`, state kept by the checkpointer)
+via LangChain structured output, across the model tiers with `with_fallbacks`, rules last) `→ confirm` (LangGraph `interrupt`, state kept by the checkpointer)
 `→ act`. Every action goes through one gate: allowlisted per device, real devices only when `ALLOW_COMMANDS=true`, at
 most once per run, and never without a yes.
 
@@ -88,6 +103,8 @@ most once per run, and never without a yes.
 - **Website**: landing page with the film, a no-account demo, sign up / sign in / password reset (Supabase), a home
   in *room focus* with live power, follow switches and alerts, a voice-first assistant, Diagnose & fix, Devices
   (connect SmartThings), Profile. Glass UI, works on phones.
+- **Assistant**: a one-to-one conversation by voice or text, spoken back, with a model label on every reply and
+  the evidence as cards underneath. *Under the hood* shows which model tiers are ready or resting, live.
 - **SmartThings**: one login connects every device the account shares, with rooms and a count; unknown device types
   work as on/off. Tokens are encrypted before storage; every user's home is separate.
 - **Real data**: **157 real Samsung washer fault codes** (55 faults) from an MIT-licensed table, pinned and
@@ -99,7 +116,7 @@ most once per run, and never without a yes.
 
 | Area | Tools |
 |---|---|
-| AI and retrieval | **LangGraph**, **LangChain** (`langchain-core`, `langchain-google-genai`), **Gemini 3.5 Flash-Lite**, fastembed `BAAI/bge-small-en-v1.5`, `rank-bm25`, reciprocal rank fusion, semantic cache |
+| AI and retrieval | **LangGraph**, **LangChain** (`langchain-core`, `langchain-google-genai`), **Gemini** and **Gemma 4** in hedged model tiers (optional Groq, OpenRouter, Hugging Face), **ChromaDB** vector database, fastembed `BAAI/bge-small-en-v1.5`, `rank-bm25`, reciprocal rank fusion, semantic cache |
 | Backend | Python 3.12, **FastAPI**, asyncio, WebSockets, Pydantic, uvicorn, `uv` |
 | Frontend | **React 19**, Vite, TypeScript, Tailwind CSS 4, Motion, Zustand, React Router, Web Speech API |
 | Accounts and data | **Supabase** (Auth, Postgres with row-level security), Fernet encryption |
@@ -141,7 +158,8 @@ npm --prefix frontend run dev
 | Variable | What it turns on |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | accounts (sign up, profile, saved follow choices) |
-| `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini phrasing and the agent's proposals |
+| `LLM_PROVIDER=gemini`, `GEMINI_API_KEY` | the conversation and the agent's proposals, across the model tiers |
+| `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `LLM_TIERS` | more free tiers, and their order |
 | `SMARTTHINGS_CLIENT_ID`, `SMARTTHINGS_CLIENT_SECRET`, `PUBLIC_BASE_URL`, `TOKEN_ENCRYPTION_KEY` | real Samsung devices |
 | `DENSE_SEARCH=false` | BM25 only, no model download |
 | `CORS_ORIGINS`, `TRUSTED_PROXY_HOPS` | hosting the website separately (e.g. Vercel) |
@@ -163,17 +181,19 @@ make test
 make e2e
 ```
 
-- **Backend: 310 tests, 95 % coverage** (unit + integration, including the full socket flow and the agents).
-- **Frontend: 55 tests** (vitest + Testing Library); `tsc`, ESLint and knip clean.
-- **End to end: 27 real-browser checks** at desktop and phone size on the production build (landing, film streaming,
-  demo, alerts, cited answers, the three agents, sign-in guard, security headers, no sideways scroll).
+- **Backend: 334 tests, 95 % coverage** (unit + integration, including the full socket flow, the agents, the
+  vector database, the model tiers failing over and racing, and the conversation).
+- **Frontend: 56 tests** (vitest + Testing Library); `tsc`, ESLint and knip clean.
+- **End to end: 29 real-browser checks** at desktop and phone size on the production build (landing, film streaming,
+  demo, alerts, cited answers, the conversation, the three agents, sign-in guard, security headers, no sideways
+  scroll).
 
 ## Data and honesty
 
 | Data | Status |
 |---|---|
 | Samsung washer fault codes (157 codes) | **Real**, from [ha-samsung-washer-local](https://github.com/perseus177/ha-samsung-washer-local) (MIT), pinned and hash-checked; wording is that project's own, not Samsung's |
-| Samsung washer, dryer, fridge, dishwasher codes (84 rows) | **Real**, from [ApplianceDB](https://github.com/ApplianceDB/ApplianceDB-public) (ODbL 1.0), delivered as a spreadsheet in [`data/real/`](data/real) for embedding |
+| Samsung washer, dryer, fridge, dishwasher codes (84 rows) | **Real**, from [ApplianceDB](https://github.com/ApplianceDB/ApplianceDB-public) (ODbL 1.0), embedded into ChromaDB ([`backend/data/vector_db/`](backend/data/vector_db)) and queried live; also as a spreadsheet in [`data/real/`](data/real) |
 | WW90T washer, DV90T dryer, AR12 AC manuals | **Sample** manuals we wrote, labelled "sample manual" in every citation |
 | Demo home devices | **Simulated**; real devices appear after a SmartThings login |
 | Air conditioner fault codes | No openly licensed source exists; Samsung's pages forbid copying, so not used |
@@ -192,12 +212,15 @@ zero hallucination (templates carry every fact so the model can't invent one).
 ```
 backend/            FastAPI engine
   app/agent/          LangGraph agent, preference store, session-intent prefetch
-  app/retrieval/      manual search (BM25 + dense + RRF), semantic cache, live state
+  app/answer/         answer cards and the one-to-one conversation
+  app/llm/            model tiers (Gemini, Gemma, OpenAI-compatible), hedged fallback
+  app/retrieval/      manual search (BM25 + dense + RRF), ChromaDB vector database, semantic cache, live state
   app/nlu/ planning/  clause extraction, query plans, park and resume, orchestrator
   app/devices/        simulator, SmartThings (OAuth, webhooks), command gate
   data/manuals/       manuals and the real Samsung fault table
+  data/vector_db/     ChromaDB: 84 real Samsung codes, bge-small embeddings
   scripts/            data ingestion and export (pinned, hash-checked)
-  tests/              310 tests
+  tests/              334 tests
 frontend/           React website (src/pages, src/components, src/lib)
 data/real/          real fault data as a spreadsheet and CSV, with sources and licences
 docs/               presentation, architecture diagram, screenshots, dev notes

@@ -143,6 +143,17 @@ def test_a_real_samsung_code_is_answered_from_the_fault_table(client):
         assert card["sources"][0]["label"] == "Samsung washer fault codes §4E"
 
 
+def test_a_code_the_manual_lacks_is_answered_from_the_vector_database(client):
+    with demo_session(client, "vector-code") as (ws, _, _):
+        ws.send_json({"type": "transcript.final", "data": {"text": "what does HC2 mean on the dryer", "seq": 1}})
+        problem = lambda m: m["data"]["type"] == "problem"  # noqa: E731
+        card = read_until(ws, "card.upsert", where=problem)[-1]["data"]
+        assert card["title"].startswith("HC2 · ")
+        assert card["sources"][0]["label"] == "ApplianceDB Samsung codes (ODbL) §HC2"
+        reply = read_until(ws, "chat.reply")[-1]["data"]  # no model in tests: the cards speak for themselves
+        assert reply["model"] == "templates" and "HC2" in reply["text"]
+
+
 def test_the_three_agents_diagnose_and_act_only_after_a_yes(client):
     with demo_session(client, "agents-flow") as (ws, _, _):
         ws.send_json({"type": "sim.trigger", "data": {"scenario": "washer_e3"}})

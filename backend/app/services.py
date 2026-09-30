@@ -19,6 +19,7 @@ from app.llm.base import AnswerModel, make_llm
 from app.retrieval.embedder import make_embedder
 from app.retrieval.manual_ingest import load_manuals
 from app.retrieval.manual_search import ManualIndex
+from app.retrieval.vector_db import open_vector_codes
 
 
 @dataclass
@@ -47,13 +48,15 @@ class Services:
 async def load_manual_index(settings: Settings) -> ManualIndex:
     embedder = await asyncio.to_thread(make_embedder, settings.dense_search)
     sections = await asyncio.to_thread(load_manuals, DATA_DIR / "manuals")
-    return await asyncio.to_thread(ManualIndex, sections, embedder)
+    embed_query = embedder.embed_query if embedder else None
+    vectors = await asyncio.to_thread(open_vector_codes, DATA_DIR / "vector_db", embed_query)
+    return await asyncio.to_thread(ManualIndex, sections, embedder, vectors)
 
 
 async def build_services(settings: Settings, http: httpx.AsyncClient | None = None) -> Services:
     http = http or httpx.AsyncClient()
     manuals = await load_manual_index(settings)
-    llm = make_llm(settings.llm_provider, settings.gemini_api_key, settings.gemini_model)
+    llm = make_llm(settings)
     accounts = bool(settings.supabase_url and settings.supabase_publishable_key)
     verifier = (
         SupabaseVerifier(settings.supabase_url, http_jwks_fetcher(settings.supabase_url, http)) if accounts else None

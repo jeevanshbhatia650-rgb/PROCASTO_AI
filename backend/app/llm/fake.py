@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.core.models import Intent
+from app.llm.base import Message
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _STEP = re.compile(r"^\s*1\.\s+(.*)$", re.MULTILINE)
@@ -19,3 +20,9 @@ class FakeAnswerModel:
         first = _SENTENCE_END.split(prose.strip())[0]
         step = _STEP.search(manual_text)
         return f"{first} Start with this: {step.group(1)}" if step else first
+
+    async def chat(self, system: str, messages: list[Message], max_tokens: int = 300) -> tuple[str, str]:
+        return "", self.name  # no conversation: the session speaks the answer cards instead
+
+    def status(self) -> list[dict[str, Any]]:
+        return []

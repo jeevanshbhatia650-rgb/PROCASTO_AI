@@ -1,4 +1,6 @@
-"""F11: hybrid manual search. Filter by model (fallback family), BM25 + dense, fused with RRF (k=60)."""
+"""F11: hybrid manual search. Filter by model (fallback family), BM25 + dense, fused with RRF (k=60).
+
+A code the manuals don't cover falls through to the vector database (ChromaDB, real Samsung codes)."""
 
 import asyncio
 import re
@@ -15,6 +17,7 @@ from app.retrieval.base import evidence_id
 from app.retrieval.embedder import Embedder
 from app.retrieval.manual_ingest import Section
 from app.retrieval.semantic_cache import SemanticCache
+from app.retrieval.vector_db import VectorCodes
 
 RRF_K = 60
 EXACT_CODE_BOOST = 1.0  # an exact error-code heading always outranks fuzzy matches
@@ -61,8 +64,11 @@ class Hit:
 
 
 class ManualIndex:
-    def __init__(self, sections: list[Section], embedder: Embedder | None = None) -> None:
+    def __init__(
+        self, sections: list[Section], embedder: Embedder | None = None, vectors: VectorCodes | None = None
+    ) -> None:
         self._embedder = embedder
+        self.vectors = vectors
         self.reload(sections)
 
     def reload(self, sections: list[Section]) -> None:
@@ -103,10 +109,20 @@ class ManualIndex:
 
     def error_codes(self) -> list[str]:
         """Every code a manual has a section for, so speech and typing can recognise it."""
-        return sorted({code for s in self._sections for code in s.heading_codes})
+        vector = self.vectors.codes() if self.vectors else set()
+        return sorted({code for s in self._sections for code in s.heading_codes} | vector)
 
     def search(
         self, query: str, model_id: str, family: str | None = None, error_code: str | None = None, k: int = 2
+    ) -> list[Hit]:
+        hits = self._search_manuals(query, model_id, family, error_code, k)
+        if error_code and family and self.vectors and not any(error_code in h.section.heading_codes for h in hits):
+            found = self.vectors.lookup(family, error_code)
+            hits = [Hit(s, EXACT_CODE_BOOST) for s in found[:1]] + hits  # one row: markets repeat the same code
+        return hits[:k]
+
+    def _search_manuals(
+        self, query: str, model_id: str, family: str | None, error_code: str | None, k: int
     ) -> list[Hit]:
         key = f"model:{model_id}" if f"model:{model_id}" in self._groups else f"family:{family}"
         idx = self._groups.get(key, [])

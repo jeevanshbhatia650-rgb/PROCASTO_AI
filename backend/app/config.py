@@ -16,9 +16,20 @@ class Settings(BaseSettings):
     # Only the repo's own .env. Reading one from the current directory could pick up another project's keys.
     model_config = SettingsConfigDict(env_file=BACKEND_DIR.parent / ".env", extra="ignore")
 
-    llm_provider: Literal["fake", "gemini"] = "fake"
+    llm_provider: Literal["fake", "gemini", "tiers"] = "fake"  # anything but "fake" turns on the model tiers
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-lite"
+    groq_api_key: str = ""
+    openrouter_api_key: str = ""
+    hf_token: str = ""
+    # Tried in order; a tier whose provider has no key is skipped, one that fails rests and the next answers.
+    # Gemma 4 is Google's open-weights model on the same free API; each model has its own quota.
+    llm_tiers: str = (
+        "gemini:gemini-3.1-flash-lite,gemini:gemma-4-26b-a4b-it,gemini:gemini-3.5-flash-lite,"
+        "gemini:gemini-flash-lite-latest,gemini:gemma-4-31b-it,groq:llama-3.3-70b-versatile,"
+        "openrouter:meta-llama/llama-3.3-70b-instruct:free,hf:openai/gpt-oss-20b"
+    )
+    llm_tier_timeout_ms: int = 8000  # per model; it rests after this
+    llm_hedge_ms: int = 2000  # a model this slow gets the next tier racing alongside it
     smartthings_client_id: str = ""
     smartthings_client_secret: str = ""
     smartthings_redirect_uri: str = "http://localhost:8000/auth/smartthings/callback"

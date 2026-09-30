@@ -48,12 +48,20 @@ export type AgentRun = {
   acted: boolean; // true only when a device really changed
 };
 
+/** One model in the fallback chain: resting after a rate limit or error, ready otherwise. */
+type ModelTier = { model: string; ready: boolean; failures: number };
+
 export type AgentsStats = {
   cache: { hits: number; misses: number; hit_rate: number | null; prefetched: number; prefetch_hits: number } | null;
   preferences: Record<string, Record<string, unknown>>;
   domains: string[];
   push: boolean;
+  models?: ModelTier[];
+  vector_db?: number | null; // rows in the ChromaDB fault-code database
 };
+
+/** The conversation's reply to one utterance; `model` is "templates" when the answer cards spoke instead. */
+type ChatReply = { utterance_id: string; text: string; model: string };
 
 export type SpeechSay = { text: string; card_id: string; priority: "normal" | "update" };
 export type DemoStep = { index?: number; total?: number; text?: string; done?: boolean };
@@ -78,6 +86,7 @@ export type ServerMessage =
   | { type: "session.reset"; data: Empty }
   | { type: "agent.update"; data: AgentRun }
   | { type: "agents.stats"; data: AgentsStats }
+  | { type: "chat.reply"; data: ChatReply }
   | { type: "error"; data: { message: string } };
 
 export type ScenarioId = "washer_e3" | "washer_done" | "ac_spike" | "dryer_done" | "reset";

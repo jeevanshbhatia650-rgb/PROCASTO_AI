@@ -122,10 +122,27 @@ async def rule_proposer(
     return Proposal(explanation=f"Nothing is wrong with the {info.display_name} right now.", steps=[])
 
 
-def gemini_proposer(api_key: str, model: str) -> Proposer:
+def gemini_models(tiers: str) -> list[str]:
+    """The Gemini tiers from LLM_TIERS that return structured output (Gemma on this API doesn't)."""
+    names = [item.partition(":")[2] for item in tiers.split(",") if item.strip().startswith("gemini:")]
+    return [n for n in names if n.startswith("gemini-")]
+
+
+def gemini_proposer(api_key: str, models: list[str]) -> Proposer:
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    llm = ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=0).with_structured_output(Proposal)
+    chains = [
+        ChatGoogleGenerativeAI(
+            model=m,
+            google_api_key=api_key,
+            temperature=0,
+            max_retries=0,  # a busy model should hand over to the next tier, not retry
+            timeout=8,
+            thinking_config={"thinking_level": "minimal"},
+        ).with_structured_output(Proposal)
+        for m in models
+    ]
+    llm = chains[0].with_fallbacks(chains[1:])  # LangChain's tiers: the next model answers when one fails
 
     async def propose(
         info: DeviceInfo, live: dict[str, Any], hits: list[dict[str, Any]], prefs: dict[str, Any], question: str
@@ -216,8 +233,9 @@ class DiagnoseAgent:
     def __init__(self, ctx: AppContext, propose: Proposer | None = None) -> None:
         settings = ctx.settings
         if propose is None:
-            use_gemini = settings.llm_provider == "gemini" and settings.gemini_api_key
-            propose = gemini_proposer(settings.gemini_api_key, settings.gemini_model) if use_gemini else rule_proposer
+            models = gemini_models(settings.llm_tiers)
+            use_gemini = settings.llm_provider != "fake" and settings.gemini_api_key and models
+            propose = gemini_proposer(settings.gemini_api_key, models) if use_gemini else rule_proposer
         self._ctx = ctx
         self._graph = build_graph(ctx, propose)
 

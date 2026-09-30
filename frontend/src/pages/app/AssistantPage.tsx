@@ -10,6 +10,7 @@ import { SplitPane } from "../../components/layout/SplitPane";
 import { AgentPanel } from "../../components/user/AgentPanel";
 import { AnswerCards } from "../../components/user/AnswerCards";
 import { ChatPanel } from "../../components/user/ChatPanel";
+import { Conversation } from "../../components/user/Conversation";
 import { DeviceGrid } from "../../components/user/DeviceGrid";
 import { useShortcuts } from "../../hooks/useShortcuts";
 import { useSpeech } from "../../hooks/useSpeech";
@@ -34,7 +35,7 @@ function VoiceToggle() {
   );
 }
 
-/** Ask by voice or text; answers arrive as cards, with the engine view one switch away. */
+/** Ask by voice or text; PROCASTO talks back, the cards carry the evidence, the engine view is one switch away. */
 export default function AssistantPage() {
   const { mode } = useShell();
   const hoodOpen = useStore((s) => s.hoodOpen);
@@ -68,6 +69,9 @@ export default function AssistantPage() {
           <>
             <ErrorBoundary name="ask">
               <ChatPanel voice={voice} question={question} onAsked={clearParams} />
+            </ErrorBoundary>
+            <ErrorBoundary name="conversation">
+              <Conversation />
             </ErrorBoundary>
             <ErrorBoundary name="devices">
               <DeviceGrid />

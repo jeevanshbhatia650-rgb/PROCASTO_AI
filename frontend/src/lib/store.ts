@@ -11,6 +11,7 @@ import type {
 import type { AgentRun, AgentsStats, ClausesUpdate, DemoStep, Hello, ServerMessage, SpeechSay } from "./protocol";
 
 type Turn = { id: string; text: string };
+type ChatLine = { id: string; role: "you" | "assistant"; text: string; model?: string; at: number };
 type Connection = "connecting" | "open" | "closed";
 
 export type Data = {
@@ -19,6 +20,7 @@ export type Data = {
   devices: Record<string, DeviceSnapshot>;
   transcript: ClausesUpdate | null;
   turns: Turn[];
+  chat: ChatLine[]; // the one-to-one conversation, oldest first
   plan: QueryPlan | null;
   parked: ParkedPlan[];
   tasks: Record<string, RetrievalTask>;
@@ -39,6 +41,7 @@ export type Data = {
 };
 
 const MAX_TIMELINE = 500;
+const MAX_CHAT = 12;
 export const POWER_SAMPLE_MS = 3000;
 export const MAX_POWER_SAMPLES = 40;
 const EMPTY_POWER: number[] = [];
@@ -57,6 +60,7 @@ export const initialData: Data = {
   devices: {},
   transcript: null,
   turns: [],
+  chat: [],
   plan: null,
   parked: [],
   tasks: {},
@@ -77,7 +81,7 @@ export const initialData: Data = {
 };
 
 const SESSION_RESET = {
-  transcript: null, turns: [], plan: null, parked: [], tasks: {}, cards: {}, timeline: [],
+  transcript: null, turns: [], chat: [], plan: null, parked: [], tasks: {}, cards: {}, timeline: [],
   metrics: EMPTY_METRICS, speech: null, demo: null, power: EMPTY_POWER, agentRun: null, agentBusy: null,
 } satisfies Partial<Data>;
 
@@ -102,6 +106,10 @@ export function withPowerSample(power: number[], devices: Record<string, DeviceS
   return [...power.slice(-(MAX_POWER_SAMPLES - 1)), totalPower(devices)];
 }
 
+function withLine(chat: ChatLine[], line: ChatLine): ChatLine[] {
+  return [...chat.filter((l) => l.id !== line.id), line].slice(-MAX_CHAT);
+}
+
 function without<T>(record: Record<string, T>, key: string): Record<string, T> {
   const next = { ...record };
   delete next[key];
@@ -118,8 +126,10 @@ export function reduce(state: Data, msg: ServerMessage, receivedAt = Date.now())
     case "device.update":
       return { devices: { ...state.devices, [msg.data.info.device_id]: msg.data } };
     case "clauses.update": {
-      const turns = msg.data.final ? [...state.turns.slice(-3), { id: msg.data.utterance_id, text: msg.data.text }] : state.turns;
-      return { transcript: msg.data, turns };
+      if (!msg.data.final) return { transcript: msg.data };
+      const turns = [...state.turns.slice(-3), { id: msg.data.utterance_id, text: msg.data.text }];
+      const said: ChatLine = { id: msg.data.utterance_id, role: "you", text: msg.data.text, at: receivedAt };
+      return { transcript: msg.data, turns, chat: withLine(state.chat, said) };
     }
     case "plan.update":
       return { plan: msg.data };
@@ -149,6 +159,10 @@ export function reduce(state: Data, msg: ServerMessage, receivedAt = Date.now())
       return { agentRun: msg.data, agentBusy: null };
     case "agents.stats":
       return { agentsStats: msg.data };
+    case "chat.reply": {
+      const { utterance_id, text, model } = msg.data;
+      return { chat: withLine(state.chat, { id: `${utterance_id}:reply`, role: "assistant", text, model, at: receivedAt }) };
+    }
     case "error":
       return { toast: { id: nextId(), message: msg.data.message }, agentBusy: null };
   }

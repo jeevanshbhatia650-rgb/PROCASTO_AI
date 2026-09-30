@@ -79,6 +79,10 @@ async def demo_fault_to_answer(page: Page, base: str) -> None:
     await expect(problem.first).to_be_visible(timeout=20000)
     await expect(page.get_by_text("WW90T sample manual §E3 p.41").first).to_be_visible()
     step("Ask why answers with the manual page it came from")
+    thread = page.get_by_role("region", name="Conversation").get_by_role("listitem")
+    await expect(thread).to_have_count(2, timeout=20000)  # what was asked, and PROCASTO's reply
+    await expect(thread.last).to_contain_text("via ")
+    step("PROCASTO replies in the conversation and says which model answered")
 
     await page.get_by_role("switch", name="Under the hood").click()
     await expect(page.get_by_text("Head start")).to_be_visible()

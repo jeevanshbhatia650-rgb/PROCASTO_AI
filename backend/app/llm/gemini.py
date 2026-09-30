@@ -1,32 +1,39 @@
-"""Gemini via its REST API. Only used when LLM_PROVIDER=gemini and GEMINI_API_KEY is set."""
-
-from typing import Any
+"""Gemini and Gemma (open weights) through Google's generateContent REST API; one free quota per model."""
 
 import httpx
 
-from app.core.models import Intent
-from app.llm.base import SYSTEM_PROMPT, user_prompt
+from app.llm.base import Message
 
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
-class GeminiAnswerModel:
-    name = "gemini"
+def thinking(model: str) -> dict[str, object]:
+    """Voice can't wait for long reasoning: 2.x models take a zero budget, newer ones the minimal level."""
+    return {"thinkingBudget": 0} if model.startswith("gemini-2") else {"thinkingLevel": "minimal"}
 
+
+class GeminiChat:
     def __init__(self, api_key: str, model: str, client: httpx.AsyncClient | None = None) -> None:
+        self.name = model
         self._api_key = api_key
-        self._model = model
-        self._client = client or httpx.AsyncClient(timeout=httpx.Timeout(5.0))
+        self._client = client or httpx.AsyncClient(timeout=httpx.Timeout(15.0))
 
-    async def phrase(self, intent: Intent, facts: dict[str, Any], manual_text: str | None) -> str:
+    async def complete(self, system: str, messages: list[Message], max_tokens: int) -> str:
         body = {
-            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-            "contents": [{"role": "user", "parts": [{"text": user_prompt(intent, facts, manual_text)}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200},
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [
+                {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["text"]}]}
+                for m in messages
+            ],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": max_tokens,
+                "thinkingConfig": thinking(self.name),
+            },
         }
         response = await self._client.post(
-            URL.format(model=self._model), json=body, headers={"x-goog-api-key": self._api_key}
+            URL.format(model=self.name), json=body, headers={"x-goog-api-key": self._api_key}
         )
         response.raise_for_status()
-        parts = response.json()["candidates"][0]["content"]["parts"]
-        return " ".join(p.get("text", "") for p in parts).strip()
+        parts = response.json()["candidates"][0]["content"].get("parts", [])
+        return " ".join(p.get("text", "") for p in parts if not p.get("thought")).strip()

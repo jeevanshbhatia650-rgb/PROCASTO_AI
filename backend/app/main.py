@@ -23,7 +23,7 @@ UI_DIST = BACKEND_DIR.parent / "frontend" / "dist"
 
 async def build_context(settings: Settings) -> AppContext:
     """One simulated home with its own manual index, for tests and scripts."""
-    llm = make_llm(settings.llm_provider, settings.gemini_api_key, settings.gemini_model)
+    llm = make_llm(settings)
     return build_home(settings, SystemClock(), await load_manual_index(settings), llm)
 
 
@@ -36,11 +36,12 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         services = await build_services(settings, http)
         app.state.services = services
         log.info(
-            "PROCASTO-AI ready: accounts=%s smartthings=%s llm=%s dense=%s",
+            "PROCASTO-AI ready: accounts=%s smartthings=%s llm=%s dense=%s vector_db=%s",
             services.verifier is not None,
             services.smartthings_enabled,
             services.llm.name,
             services.manuals.dense_model or "off",
+            f"chroma ({services.manuals.vectors.size} rows)" if services.manuals.vectors else "off",
         )
         yield
         await services.close()

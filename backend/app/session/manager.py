@@ -9,6 +9,7 @@ from typing import Any
 from app.agent.diagnose import DiagnoseAgent
 from app.agent.intent import prefetch, session_domains
 from app.answer.composer import Composer
+from app.answer.conversation import Conversation, grounding
 from app.answer.templates import CardText, spoken_name
 from app.context import AppContext
 from app.core.ids import IdCounter
@@ -31,6 +32,7 @@ from app.state.live_store import DeviceChange
 log = logging.getLogger(__name__)
 Send = Callable[[str, Any], None]
 SETTLE_POLLS = 15  # wait up to 1.5 s for retrieval to finish before speaking
+CHAT_BUDGET_S = 12.0  # every model tier together; after this the answer cards are spoken instead
 MAX_TRACKED_CARDS = 200
 
 
@@ -40,6 +42,7 @@ class Utterance:
     start_ms: int
     seq: int = -1
     kind: str = "question"  # question | correction | resume | cancel
+    text: str = ""  # the final transcript, what the conversation answers
     stable_seen: set[str] = field(default_factory=set)
     meta_done: set[str] = field(default_factory=set)
 
@@ -71,6 +74,7 @@ class Session:
             ctx.llm, ctx.infos, self.evidence, self._send, self.timeline, ctx.settings.llm_timeout_ms
         )
         self.speech = SpeechChannel(ctx.clock, self._send, self.composer, self.timeline)
+        self.conversation = Conversation(ctx.llm)
         self.extractor = ClauseExtractor(ctx.lexicon, ctx.settings.clause_stability_n)
         retrievers = {
             "live_state": LiveStateRetriever(ctx.store, "smartthings" if ctx.simulator is None else "simulator"),
@@ -126,6 +130,7 @@ class Session:
     async def on_final(self, text: str, seq: int) -> None:
         utt = self._ensure_utterance()
         utt.seq = max(utt.seq, seq)
+        utt.text = text
         self._process(utt, text, final=True)
         self.timeline.emit("transcript", text=text, seq=seq, utterance_id=utt.utterance_id, final=True)
         self.metrics.end_utterance(self.timeline.now_ms())
@@ -165,6 +170,8 @@ class Session:
             "preferences": prefs,
             "domains": sorted(session_domains(self.context.recent_devices(), ctx.infos)),
             "push": ctx.simulator is None,  # real homes are fed by SmartThings webhooks; the demo by the simulator
+            "models": ctx.llm.status(),
+            "vector_db": ctx.manuals.vectors.size if ctx.manuals.vectors else None,
         }
 
     @property
@@ -289,18 +296,51 @@ class Session:
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.05)  # let the last composition land
         plan = self.engine.active()
-        if self._utterance is not None or plan is None or utt.kind == "cancel":
+        if self._utterance is not None or utt.kind == "cancel":
             return  # the user is talking again, or asked us to stop
-        cards = self.composer.cards_for(plan.plan_id)
+        cards = self.composer.cards_for(plan.plan_id) if plan else []
         if utt.kind == "resume":
             status = next((c for c in cards if c.type == CardType.STATUS), None)
             name = self._ctx.infos[status.device_id].display_name if status and status.device_id else ""
             spoken = (f"Back to the {spoken_name(name)}. {status.speakable}", status.card_id) if status else None
+            if spoken:
+                self._send("chat.reply", {"utterance_id": utt.utterance_id, "text": spoken[0], "model": "templates"})
+                self.conversation.remember(utt.text, spoken[0])
         else:
-            spoken = self.composer.spoken_summary(plan.plan_id)
-        if spoken:
+            spoken = await self._answer(utt, cards)
+        if spoken and self._utterance is None:
             self.speech.speak(*spoken)
-            self._spoken_plan = plan.plan_id
+            self._spoken_plan = plan.plan_id if plan else None
+
+    async def _answer(self, utt: Utterance, cards: list[AnswerCard]) -> tuple[str, str] | None:
+        """The conversation's reply when a model answers; otherwise the answer cards' own summary."""
+        reply = await self._converse(utt.text, cards)
+        if self._utterance is not None:
+            return None  # they started talking while it thought: that reply is stale
+        card_id = cards[0].card_id if cards else ""
+        if reply is None:
+            summary = self.composer.spoken_summary(cards[0].plan_id) if cards else None
+            if summary is None:
+                return None
+            (text, card_id), model = summary, "templates"
+            self.conversation.remember(utt.text, text)
+        else:
+            text, model = reply
+        self._send("chat.reply", {"utterance_id": utt.utterance_id, "text": text, "model": model})
+        self._send("agents.stats", self.agents_stats())  # which model tiers answered or are resting
+        return text, card_id
+
+    async def _converse(self, question: str, cards: list[AnswerCard]) -> tuple[str, str] | None:
+        if not question.strip():
+            return None
+        try:
+            facts = await asyncio.to_thread(grounding, self._ctx, cards, question)
+            return await asyncio.wait_for(self.conversation.reply(question, facts), CHAT_BUDGET_S)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # every tier busy, or too slow: the cards still answer
+            log.warning("conversation unavailable (%s); speaking the answer cards", type(exc).__name__)
+            return None
 
     def _on_cards(self, cards: list[AnswerCard]) -> None:
         self.metrics.card_shown(self.timeline.now_ms())

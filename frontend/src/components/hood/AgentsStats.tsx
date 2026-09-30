@@ -1,5 +1,6 @@
-import { BrainCircuit, DatabaseZap, Radio, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { BrainCircuit, Database, DatabaseZap, Layers, Radio, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { useStore } from "../../lib/store";
+import { modelLabel } from "../user/Conversation";
 
 function Row({ Icon, title, children }: { Icon: LucideIcon; title: string; children: React.ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export function AgentsStats() {
   if (!stats) return null;
   const cache = stats.cache;
   const prefs = Object.entries(stats.preferences);
+  const models = stats.models ?? [];
   return (
     <section className="card p-5" aria-label="The three agents">
       <h3 className="t-caption-strong">The three agents</h3>
@@ -46,6 +48,22 @@ export function AgentsStats() {
           {cache ? `${cache.prefetched} warmed ahead, ${cache.prefetch_hits} used` : "Off"}
           {stats.domains.length > 0 && ` · this session is about ${stats.domains.join(" and ")}`}
         </Row>
+        {stats.vector_db != null && (
+          <Row Icon={Database} title="Vector database · ChromaDB">
+            {stats.vector_db} real Samsung fault codes, embedded with bge-small. Codes the manuals lack are looked up
+            here; free-form questions search it by meaning.
+          </Row>
+        )}
+        {models.length > 0 && (
+          <Row Icon={Layers} title="Model tiers · automatic fallback">
+            {models.map((m, i) => (
+              <span key={m.model} className="block">
+                {i + 1}. {modelLabel(m.model)}: {m.ready ? "ready" : "resting after an error"}
+                {m.failures > 0 && ` · ${m.failures} failed`}
+              </span>
+            ))}
+          </Row>
+        )}
         <Row Icon={SlidersHorizontal} title="Preferences · key-value store">
           {prefs.length === 0
             ? "Nothing remembered yet. Confirmed actions teach it."

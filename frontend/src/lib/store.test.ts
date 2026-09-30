@@ -67,6 +67,29 @@ describe("store reducer", () => {
     expect(s.turns).toEqual([{ id: "U1", text: "is the dryer done" }]);
   });
 
+  it("builds the conversation from what was said and what came back, capped", () => {
+    const base = { clauses: [], spans: [], is_correction: false, mentions: [], final: true };
+    let s = apply(
+      initialData,
+      { type: "clauses.update", data: { ...base, utterance_id: "U1", text: "hi" } },
+      { type: "chat.reply", data: { utterance_id: "U1", text: "Hello!", model: "gemma-4-26b-a4b-it" } },
+    );
+    expect(s.chat.map((l) => [l.role, l.text, l.model])).toEqual([
+      ["you", "hi", undefined],
+      ["assistant", "Hello!", "gemma-4-26b-a4b-it"],
+    ]);
+    for (let n = 2; n <= 10; n++) {
+      s = apply(
+        s,
+        { type: "clauses.update", data: { ...base, utterance_id: `U${n}`, text: `q${n}` } },
+        { type: "chat.reply", data: { utterance_id: `U${n}`, text: `a${n}`, model: "templates" } },
+      );
+    }
+    expect(s.chat).toHaveLength(12);
+    expect(s.chat.at(-1)?.text).toBe("a10");
+    expect(apply(s, { type: "session.reset", data: {} }).chat).toEqual([]);
+  });
+
   it("caps tasks and keeps the newest", () => {
     let s = initialData;
     for (let n = 1; n <= 70; n++) s = apply(s, { type: "task.update", data: task(n) });

@@ -102,6 +102,11 @@ export const End: React.FC = () => {
           </div>
         </Rise>
       </AbsoluteFill>
+      <Rise at={50} style={{ position: "absolute", bottom: 150, width: "100%", display: "flex", justifyContent: "center", gap: 12 }}>
+        {["LangGraph", "LangChain", "Gemini", "FastAPI", "React", "Supabase", "SmartThings API"].map((tech) => (
+          <Tag key={tech}>{tech}</Tag>
+        ))}
+      </Rise>
       <Rise at={60} style={{ position: "absolute", bottom: 50, width: "100%", textAlign: "center" }}>
         <div style={{ fontFamily: body, fontSize: 20, color: "rgba(17,17,19,0.45)", lineHeight: 1.5 }}>
           An independent project, not affiliated with Samsung. SmartThings is a trademark of Samsung Electronics.

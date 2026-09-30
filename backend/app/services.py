@@ -46,7 +46,7 @@ class Services:
 
 
 async def load_manual_index(settings: Settings) -> ManualIndex:
-    embedder = await asyncio.to_thread(make_embedder, settings.dense_search)
+    embedder = await asyncio.to_thread(make_embedder, settings.dense_search, settings.embed_threads)
     sections = await asyncio.to_thread(load_manuals, DATA_DIR / "manuals")
     embed_query = embedder.embed_query if embedder else None
     vectors = await asyncio.to_thread(open_vector_codes, DATA_DIR / "vector_db", embed_query)

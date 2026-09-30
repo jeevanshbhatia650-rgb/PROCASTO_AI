@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     task_timeout_ms: int = 3000
     llm_timeout_ms: int = 1500
     dense_search: bool = True
+    embed_threads: int = 0  # 0 = every core; 1 on a small cloud CPU, where extra threads only spin
     sim_seed: int = 7
     cors_origins: list[str] = ["http://localhost:5180", "http://127.0.0.1:5180"]
     cors_origin_regex: str = ""  # e.g. a hosted front end with preview URLs: ^https://procasto[a-z0-9-]*\.vercel\.app$

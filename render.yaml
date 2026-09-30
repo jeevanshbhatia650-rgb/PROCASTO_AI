@@ -1,33 +1,30 @@
-# Render blueprint: one Docker web service. New > Blueprint > pick this repo.
-# Signed-out visitors get a throwaway demo home; accounts and SmartThings switch on once the keys below are filled.
+# Render blueprint: the engine (API, WebSocket, and the same website) as one Docker web service on the free plan.
+# Deploy: https://render.com/deploy?repo=https://github.com/jeevanshbhatia650-rgb/PROCASTO_AI
+# The only value to paste is GEMINI_API_KEY; everything else is set here. procasto.vercel.app talks to this service.
 services:
   - type: web
     name: procasto-ai
     runtime: docker
-    plan: free
+    plan: free # 512 MB RAM: the engine peaks around 320 MB with the embedding model loaded
     healthCheckPath: /healthz
     envVars:
+      - key: LLM_PROVIDER
+        value: gemini # the model tiers; "fake" = templates only
+      - key: GEMINI_API_KEY
+        sync: false # paste it when Render asks
+      - key: SUPABASE_URL
+        value: https://duaaijaftvrvkluhjxxo.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_iVIQn3hcvrFnDY_NoZoMMQ_BOsONzaV # public by design: row-level security protects the data
+      - key: CORS_ORIGINS
+        value: '["https://procasto.vercel.app"]'
+      - key: FRONTEND_URL
+        value: https://procasto.vercel.app
       - key: TRUSTED_PROXY_HOPS
         value: "1" # Render's proxy: rate limits key on the address it recorded, which visitors can't fake
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_PUBLISHABLE_KEY
-        sync: false
-      - key: TOKEN_ENCRYPTION_KEY
-        sync: false # generate once; changing it disconnects every SmartThings login
-      - key: FRONTEND_URL
-        sync: false # this site's public URL
-      - key: PUBLIC_BASE_URL
-        sync: false # same URL; SmartThings sends device events here
-      - key: SMARTTHINGS_CLIENT_ID
-        sync: false
-      - key: SMARTTHINGS_CLIENT_SECRET
-        sync: false
-      - key: SMARTTHINGS_REDIRECT_URI
-        sync: false # <public URL>/auth/smartthings/callback
-      - key: LLM_PROVIDER
-        value: fake # set to gemini and fill GEMINI_API_KEY for LLM phrasing
-      - key: GEMINI_API_KEY
-        sync: false
+      - key: EMBED_THREADS
+        value: "1" # the free plan is a slice of one CPU; more threads only spin
+      - key: MAX_DEMO_HOMES
+        value: "20"
       - key: DENSE_SEARCH
-        value: "true" # "false" = BM25 only, if the free 512 MB plan runs out of memory
+        value: "true" # "false" = BM25 only and about 150 MB less memory

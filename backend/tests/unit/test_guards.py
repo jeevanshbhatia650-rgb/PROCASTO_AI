@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from app.api.guards import RateLimiter, read_capped
 from app.main import create_app
 from tests.conftest import make_settings
+from tests.fake_cloud import cloud_settings
 
 
 def chunked(total_bytes: int, piece: int = 16 * 1024):
@@ -20,12 +21,12 @@ def chunked(total_bytes: int, piece: int = 16 * 1024):
 @pytest.mark.parametrize(
     ("settings", "path"),
     [
-        (dict(device_provider="smartthings"), "/webhooks/smartthings"),
-        (dict(alexa_skill_id="amzn1.ask.skill.test"), "/integrations/alexa"),
+        (cloud_settings, "/webhooks/smartthings"),
+        (lambda: make_settings(alexa_skill_id="amzn1.ask.skill.test"), "/integrations/alexa"),
     ],
 )
 def test_chunked_uploads_cannot_bypass_the_size_limit(settings, path):
-    with TestClient(create_app(make_settings(**settings))) as client:
+    with TestClient(create_app(settings())) as client:
         response = client.post(path, content=chunked(1_000_000))
         assert response.status_code == 413
 

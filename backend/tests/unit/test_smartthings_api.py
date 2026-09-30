@@ -3,12 +3,10 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from app.devices.smartthings.client import SmartThingsClient
 from app.devices.smartthings.oauth import OAuthError, OAuthFlow, Token
 from app.devices.smartthings.provider import SmartThingsProvider
-from app.main import create_app
 from tests.conftest import make_settings
 
 WASHER, AC, LAMP = "6cc2a018-a918-484e-a405-97838d874623", "72f235a3-1756-4afb-b5ea-0b864da02091", "11112222-3333"
@@ -45,9 +43,9 @@ async def test_code_exchange_returns_a_token_that_never_prints_itself():
     http = api({("POST", "/oauth/token"): {"access_token": "at-123", "refresh_token": "rt", "expires_in": 60,
                                              "installed_app_id": "d46a1c60-b6bd"}}, seen)  # fmt: skip
     flow = OAuthFlow("client", "secret", "http://cb", http)
-    state = parse_qs(urlparse(flow.login_url()).query)["state"][0]
-    token = await flow.exchange("the-code", state)
-    assert (token.access_token, token.installed_app_id) == ("at-123", "d46a1c60-b6bd")
+    state = parse_qs(urlparse(flow.login_url("user-1")).query)["state"][0]
+    token, owner = await flow.exchange("the-code", state)
+    assert (token.access_token, token.installed_app_id, owner) == ("at-123", "d46a1c60-b6bd", "user-1")
     assert "grant_type=authorization_code" in seen[-1][2] and "code=the-code" in seen[-1][2]
     assert seen_headers[-1]["authorization"].startswith("Basic ")  # client secret goes in the header, not the URL
     assert "at-123" not in repr(token)
@@ -86,7 +84,7 @@ async def test_provider_binds_devices_by_capability_loads_state_and_subscribes(d
     async def sink(event):
         events.append((event.device_id, event.attribute, event.value))
 
-    settings = make_settings(device_provider="smartthings", public_base_url="https://tunnel.example")
+    settings = make_settings(public_base_url="https://tunnel.example")
     provider = SmartThingsProvider(settings, devices, sink, clock, http=api(routes, seen))
     bound = await provider.connect(Token("at", None, 0.0, "d46a1c60-b6bd-4f82"))
     assert bound == {WASHER: "washer-01", AC: "ac-01"}
@@ -96,25 +94,3 @@ async def test_provider_binds_devices_by_capability_loads_state_and_subscribes(d
     assert seen[-1][1] == f"/v1/devices/{AC}/commands"
     with pytest.raises(ValueError):
         await provider.send_command("dryer-01", "power_off", {})  # no real dryer was found
-
-
-def test_smartthings_routes_in_smartthings_mode():
-    settings = make_settings(device_provider="smartthings", smartthings_client_id="cid", smartthings_client_secret="s")
-    with TestClient(create_app(settings)) as client:
-        login = client.get("/auth/smartthings/login", follow_redirects=False)
-        assert login.status_code == 307
-        assert login.headers["location"].startswith("https://api.smartthings.com/oauth/authorize?client_id=cid")
-        bad = client.get("/auth/smartthings/callback", params={"code": "x", "state": "forged"})
-        assert bad.status_code == 400
-        ping = client.post("/webhooks/smartthings", json={"lifecycle": "PING", "pingData": {"challenge": "c1"}})
-        assert ping.json() == {"pingData": {"challenge": "c1"}}
-        assert client.post("/webhooks/smartthings", json={"lifecycle": "EVENT"}).status_code == 401
-        huge = client.post("/webhooks/smartthings", content=b"x" * 300_000)
-        assert huge.status_code == 413
-
-
-def test_smartthings_routes_explain_themselves_in_simulator_mode():
-    with TestClient(create_app(make_settings())) as client:
-        assert client.post("/webhooks/smartthings", content=b"{}").status_code == 409
-        response = client.get("/auth/smartthings/login", follow_redirects=False)
-        assert response.status_code == 409 and "DEVICE_PROVIDER=smartthings" in response.json()["detail"]

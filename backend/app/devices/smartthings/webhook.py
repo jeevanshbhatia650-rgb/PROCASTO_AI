@@ -12,7 +12,7 @@ from app.devices.smartthings.mapping import map_attribute
 from app.devices.smartthings.signature import SignatureError, SignatureVerifier
 
 log = logging.getLogger(__name__)
-EventSink = Callable[[DeviceEvent], Awaitable[Any]]
+EventRouter = Callable[[dict[str, Any]], Awaitable[None]]  # hands a verified EVENT payload to the right homes
 MAX_BODY_BYTES = 256 * 1024
 
 
@@ -44,15 +44,8 @@ def device_events(payload: dict[str, Any], device_for: Callable[[str], str | Non
 
 
 class WebhookHandler:
-    def __init__(
-        self,
-        verifier: SignatureVerifier,
-        sink: EventSink,
-        device_for: Callable[[str], str | None],
-        target_url: str,
-    ) -> None:
-        self._verifier, self._sink, self._device_for = verifier, sink, device_for
-        self._target_url = target_url
+    def __init__(self, verifier: SignatureVerifier, route: EventRouter, target_url: str) -> None:
+        self._verifier, self._route, self._target_url = verifier, route, target_url
 
     async def handle(self, method: str, path: str, headers: Mapping[str, str], body: bytes) -> tuple[int, dict]:
         if len(body) > MAX_BODY_BYTES:
@@ -75,8 +68,7 @@ class WebhookHandler:
             log.warning("SmartThings wants this webhook confirmed. Open this URL once in a browser: %s", url)
             return 200, {"targetUrl": self._target_url}
         if lifecycle == "EVENT":
-            for event in device_events(payload, self._device_for):
-                await self._sink(event)
+            await self._route(payload)
             return 200, {"eventData": {}}
         log.info("ignoring SmartThings lifecycle %s", lifecycle)
         return 200, {}

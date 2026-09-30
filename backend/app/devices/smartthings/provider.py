@@ -1,4 +1,4 @@
-"""F23: real devices behind the same DeviceProvider contract as the simulator (DEVICE_PROVIDER=smartthings)."""
+"""F23: a signed-in user's real devices behind the same DeviceProvider contract as the simulator."""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -12,31 +12,24 @@ from app.core.models import DeviceEvent, DeviceInfo
 from app.devices.normalizer import normalize
 from app.devices.smartthings.client import SmartThingsClient
 from app.devices.smartthings.mapping import detect_kind, map_attribute, to_smartthings
-from app.devices.smartthings.oauth import OAuthFlow, Token
-from app.devices.smartthings.signature import SignatureVerifier, http_key_fetcher
-from app.devices.smartthings.webhook import WebhookHandler
+from app.devices.smartthings.oauth import Token
 
 log = logging.getLogger(__name__)
 EventSink = Callable[[DeviceEvent], Awaitable[Any]]
 
 
 class SmartThingsProvider:
+    """One user's real devices. Login and the webhook are server-wide and live elsewhere."""
+
     def __init__(
-        self, settings: Settings, devices: list[DeviceInfo], sink: EventSink, clock: Clock,
-        http: httpx.AsyncClient | None = None,
-    ) -> None:  # fmt: skip
-        self._http = http or httpx.AsyncClient()
+        self, settings: Settings, devices: list[DeviceInfo], sink: EventSink, clock: Clock, http: httpx.AsyncClient
+    ) -> None:
+        self._http = http  # shared by the whole server, which closes it
         self._by_kind = {d.kind: d for d in devices}
         self._sink, self._clock = sink, clock
         self._public_url = settings.public_base_url.rstrip("/")
         self._client: SmartThingsClient | None = None
         self._bindings: dict[str, str] = {}  # SmartThings deviceId -> our device_id
-        self.oauth = OAuthFlow(settings.smartthings_client_id, settings.smartthings_client_secret,
-                               settings.smartthings_redirect_uri, self._http)  # fmt: skip
-        self.webhook = WebhookHandler(
-            SignatureVerifier(http_key_fetcher(self._http)), sink, self.device_for,
-            target_url=f"{self._public_url}/webhooks/smartthings",
-        )  # fmt: skip
 
     @property
     def connected(self) -> bool:
@@ -49,10 +42,10 @@ class SmartThingsProvider:
         return self._bindings.get(smartthings_id)
 
     async def start(self) -> None:
-        log.info("SmartThings mode: open /auth/smartthings/login to connect your devices")
+        pass  # connect() already loaded the devices
 
     async def stop(self) -> None:
-        await self._http.aclose()
+        pass
 
     async def connect(self, token: Token) -> dict[str, str]:
         """Binds one real washer, dryer and AC by their capabilities, loads their state, subscribes to events."""
@@ -85,7 +78,7 @@ class SmartThingsProvider:
 
     async def send_command(self, device_id: str, command: str, args: dict[str, Any]) -> None:
         if self._client is None:
-            raise ValueError("SmartThings isn't connected yet. Open /auth/smartthings/login first.")
+            raise ValueError("SmartThings isn't connected yet.")
         smartthings_id = next((st for st, ours in self._bindings.items() if ours == device_id), None)
         if smartthings_id is None:
             raise ValueError(f"No SmartThings device is bound to {device_id}.")

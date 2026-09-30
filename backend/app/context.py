@@ -1,4 +1,4 @@
-"""Everything shared by all sessions, built once at startup."""
+"""One home as a session sees it: its devices and state, plus the services every home shares."""
 
 from dataclasses import dataclass
 
@@ -28,3 +28,4 @@ class AppContext:
     llm: AnswerModel
     lexicon: Lexicon
     commands: CommandGate
+    notice: str = ""  # shown to the user, e.g. why their real devices aren't live right now

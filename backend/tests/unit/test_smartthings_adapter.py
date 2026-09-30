@@ -20,7 +20,7 @@ from app.devices.smartthings.signature import (
     http_key_fetcher,
     signing_string,
 )  # fmt: skip
-from app.devices.smartthings.webhook import WebhookHandler
+from app.devices.smartthings.webhook import WebhookHandler, device_events
 
 FIXTURE = (Path(__file__).parents[1] / "fixtures" / "smartthings_event.json").read_bytes()
 WASHER = "6cc2a018-a918-484e-a405-97838d874623"
@@ -65,10 +65,12 @@ class Harness:
         async def sink(event):
             self.events.append((event.device_id, event.attribute, event.value, event.source))
 
+        async def route(payload):
+            for event in device_events(payload, {WASHER: "washer-01"}.get):
+                await sink(event)
+
         verifier = SignatureVerifier(fetch, now=NOW.timestamp)
-        self.handler = WebhookHandler(
-            verifier, sink, {WASHER: "washer-01"}.get, "https://example.test/webhooks/smartthings"
-        )
+        self.handler = WebhookHandler(verifier, route, "https://example.test/webhooks/smartthings")
 
     async def post(self, body: bytes, headers: dict[str, str]):
         return await self.handler.handle("POST", PATH, headers, body)

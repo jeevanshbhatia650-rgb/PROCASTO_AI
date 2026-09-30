@@ -55,7 +55,7 @@ class AlexaSessions:
     """One engine session per Alexa conversation, so a follow-up keeps its context."""
 
     def __init__(self, ctx: AppContext) -> None:
-        self._ctx = ctx
+        self.ctx = ctx
         self._sessions: dict[str, tuple[float, Session]] = {}
 
     async def get(self, alexa_session_id: str) -> Session:
@@ -67,7 +67,7 @@ class AlexaSessions:
         _, session = self._sessions.get(alexa_session_id, (now, None))
         if session is None:
             name = hashlib.sha256(alexa_session_id.encode()).hexdigest()[:24]
-            session = Session(f"alexa-{name}", self._ctx, lambda _kind, _data: None)
+            session = Session(f"alexa-{name}", self.ctx, lambda _kind, _data: None)
         self._sessions[alexa_session_id] = (now, session)
         return session
 

@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     # Only the repo's own .env. Reading one from the current directory could pick up another project's keys.
     model_config = SettingsConfigDict(env_file=BACKEND_DIR.parent / ".env", extra="ignore")
 
-    device_provider: Literal["sim", "smartthings"] = "sim"
     llm_provider: Literal["fake", "gemini"] = "fake"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash-lite"
@@ -26,6 +25,12 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     frontend_url: str = "http://localhost:5180"  # where the SmartThings login returns to
     alexa_skill_id: str = ""  # optional: only answer requests for this skill
+    # Accounts. Empty = the site runs as an open demo with no sign-in.
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""  # public by design; row-level security protects the data
+    # Fernet key. SmartThings tokens are encrypted with it before they reach the database.
+    token_encryption_key: str = ""
+    max_demo_homes: int = 50  # simulated homes for signed-out visitors, one each
     # Commands always work on the simulator; real SmartThings devices need this opt-in.
     allow_commands: bool = False
     clause_stability_n: int = 2

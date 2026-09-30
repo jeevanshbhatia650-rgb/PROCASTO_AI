@@ -38,15 +38,21 @@ def test_intents_become_sentences_the_extractor_understands():
     assert utterance_for(request("AMAZON.FallbackIntent")["request"]) is None
 
 
+def alexa_simulator(client):
+    client.post("/integrations/alexa", json=request(None, kind="LaunchRequest"))  # opens Alexa's demo home
+    return client.app.state.alexa_sessions.ctx.simulator
+
+
 def test_error_code_question_is_answered_from_the_manual(client):
-    client.post("/api/sim/trigger", json={"scenario": "washer_e3"})
+    simulator = alexa_simulator(client)
+    client.portal.call(simulator.trigger, "washer_e3")
     response = client.post("/integrations/alexa", json=request())
     assert response.status_code == 200
     out = response.json()
     assert out["version"] == "1.0"
     text = out["response"]["outputSpeech"]["text"]
     assert "The washer stopped with error E3." in text and "E3 means water not draining." in text
-    client.post("/api/sim/reset")
+    client.portal.call(simulator.trigger, "reset")
 
 
 def test_launch_keeps_the_session_open(client):

@@ -11,6 +11,7 @@ Engineering and Technology
 | **Live demo** | [procasto.vercel.app](https://procasto.vercel.app) (open **Try the live demo**, no account needed) |
 | **Film (92 s)** | [watch](https://procasto.vercel.app/media/procasto-film.mp4) · source in [`video/`](video) |
 | **Presentation** | [`docs/PROCASTO_Presentation.pptx`](docs/PROCASTO_Presentation.pptx) |
+| **AI disclosure** | [`docs/AI_Disclosure_LangAI3.0.docx`](docs/AI_Disclosure_LangAI3.0.docx) (LangAI 3.0, Team Pokemon) |
 | **Architecture** | [diagram below](#how-it-works) |
 
 ![The PROCASTO home: one room at a time, live power, follow switches](docs/screenshots/home.jpg)
@@ -226,7 +227,7 @@ backend/            FastAPI engine
   tests/              334 tests
 frontend/           React website (src/pages, src/components, src/lib)
 data/real/          real fault data as a spreadsheet and CSV, with sources and licences
-docs/               presentation, architecture diagram, screenshots, dev notes
+docs/               presentation, AI disclosure form, architecture diagram, screenshots, dev notes
 e2e/                real-browser smoke test (Playwright)
 supabase/           database migrations (row-level security)
 video/              the film's source (Remotion)

@@ -1,4 +1,4 @@
-# Real Samsung appliance data
+# Real Samsung appliance data from Samsung smart things platform
 
 Plain CSV, UTF-8, one row per fault code. Rebuild with `cd backend && uv run python -m scripts.export_real_data`
 (both sources are pinned to one commit, so a rebuild gives the same rows).

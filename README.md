@@ -1,4 +1,4 @@
-# PROCASTO · Your home, explained
+# PROCASTO · Your home automation architecture
 
 **A voice assistant for the Samsung SmartThings home that answers from live device state and that model's manual,
 starts looking things up before you finish speaking, and keeps up when you change your mind.**
